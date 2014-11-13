@@ -19,7 +19,7 @@
  * for page directory for a given virtual address va).
  *
  * @pid: pid of the target process you want to investigate, if pid == -1,
- *       you should dump the current process's page tables
+ *       dump the current process's page tables
  * @fake_pgd: base address of the fake pgd table
  * @addr: base address in the user space that the page tables should map to
  */
@@ -28,5 +28,8 @@ SYSCALL_DEFINE3(expose_page_table,
 				unsigned long, fake_pgd,
 				unsigned long, addr)
 {
+	if (pid == -1)
+		/* TODO: dump the current process's page tables */
+		return -EINVAL;
 	return 0;
 }
