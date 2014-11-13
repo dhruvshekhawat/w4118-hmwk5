@@ -9,6 +9,7 @@
 #include <asm-generic/errno-base.h>
 #include <linux/syscalls.h>
 #include <asm/uaccess.h>
+#include <asm/current.h>
 
 /* Map a target process's page table into address space of the current process.
  *
@@ -28,8 +29,19 @@ SYSCALL_DEFINE3(expose_page_table,
 				unsigned long, fake_pgd,
 				unsigned long, addr)
 {
+
+	struct task_struct *tsk;
+	struct mm_struct *tsk_mm;
+	struct vm_area_struct *tsk_vma;
+
 	if (pid == -1)
-		/* TODO: dump the current process's page tables */
+		tsk = find_task_by_vpid(current->pid);
+	else
+		tsk = find_task_by_vpid(pid);
+	if (tsk == NULL)
 		return -EINVAL;
+
+	tsk_mm = tsk->>mm;
+
 	return 0;
 }
