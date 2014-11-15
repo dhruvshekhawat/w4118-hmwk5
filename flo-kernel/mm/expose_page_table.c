@@ -60,18 +60,21 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 	if (tsk == NULL)
 		return -EINVAL;
 	
-	down_write(tsk_mm->mmap_sem);
 	tsk_mm = tsk->mm;
+	down_write(tsk_mm->mmap_sem);
 	vma = find_vma(tsk_mm,addr);
 	if (vma == NULL) {
 		ret_code = -EFAULT;
 		goto error;
 	}
 
+	if (tsk_vma->vm_file) {
+		struct inode *inode tsk_vma->vm_file->f_path.dentry->d_inode;
+		if (imajor(inode) != MEM_MAJOR)
+
+	ret_code = walk_page_range(0, , &remap_pte);
 	vma->vm_flags |= VM_SPECIAL;
 	
-	ret_code = walk_page_range(0, , &remap_pte);
-
 error:
 	up_write(&tsk_mm->mmap_sem);
 	return ret_code;
