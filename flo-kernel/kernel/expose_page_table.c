@@ -30,9 +30,14 @@ SYSCALL_DEFINE3(expose_page_table,
 				unsigned long, addr)
 {
 
+	int ret_code = 0;
 	struct task_struct *tsk;
 	struct mm_struct *tsk_mm;
 	struct vm_area_struct *tsk_vma;
+	struct mm_walk page_walk = {};
+
+	if (addr & ~PAGE_MASK || fake_pgd & ~PAGE_MASK)
+		return -EINVAL;
 
 	if (pid == -1)
 		tsk = find_task_by_vpid(current->pid);
@@ -41,7 +46,18 @@ SYSCALL_DEFINE3(expose_page_table,
 	if (tsk == NULL)
 		return -EINVAL;
 
+	down_write(tsk_mm->mmap_sem);
 	tsk_mm = tsk->>mm;
+	vma = find_vma(tsk_mm,addr);
+	vma->vm_flags |= VM_SPECIAL;
+	page_walk.mm = mm;
+	page_walk.private = vma;
 
-	return 0;
+	ret_code = walk_page_range(0, , &page_walk);
+
+	return ret_code;
+
+error:
+	up_write(tsk_mm->mmap_sem);
+	return ret_code;
 }
