@@ -59,7 +59,7 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 	tsk = pid == -1 ? current : find_task_by_vpid(pid)
 	if (tsk == NULL)
 		return -EINVAL;
-
+	
 	down_write(tsk_mm->mmap_sem);
 	tsk_mm = tsk->mm;
 	vma = find_vma(tsk_mm,addr);
@@ -72,9 +72,7 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 	
 	ret_code = walk_page_range(0, , &remap_pte);
 
-	return ret_code;
-
 error:
-	up_write(tsk_mm->mmap_sem);
+	up_write(&tsk_mm->mmap_sem);
 	return ret_code;
 }
