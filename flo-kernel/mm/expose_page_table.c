@@ -45,26 +45,26 @@ SYSCALL_DEFINE3(expose_page_table,
 		tsk = find_task_by_vpid(pid);
 	if (tsk == NULL)
 		return -EINVAL;
-
-	down_write(tsk_mm->mmap_sem);
-	tsk_mm = tsk->>mm;
-	vma = find_vma(tsk_mm,addr);
-	if (vma == NULL) {
+	
+	tsk_mm = tsk->mm;
+	down_write(&tsk_mm->mmap_sem);
+	tsk_vma = find_vma(tsk_mm,addr);
+	if (tsk_vma == NULL) {
 		ret_code = -EFAULT;
 		goto error;
 	}
 
-	vma->vm_flags |= VM_SPECIAL;
+	tsk_vma->vm_flags |= VM_SPECIAL;
 	/* for pte_entries*/
 	page_walk.pmd_entry = walk_ptes;
 	/* for creating the fake pgd*/
 	page_walk.pud_entry = walk_pgds;
-	page_walk.mm = mm;
-	page_walk.private = vma;
+	page_walk.mm = tsk_mm;
+	page_walk.private = tsk_vma;
 
 	ret_code = walk_page_range(0, , &page_walk);
 
 error:
-	up_write(tsk_mm->mmap_sem);
+	up_write(&tsk_mm->mmap_sem);
 	return ret_code;
 }
