@@ -49,6 +49,11 @@ SYSCALL_DEFINE3(expose_page_table,
 	down_write(tsk_mm->mmap_sem);
 	tsk_mm = tsk->>mm;
 	vma = find_vma(tsk_mm,addr);
+	if (vma == NULL) {
+		ret_code = -EFAULT;
+		goto error;
+	}
+
 	vma->vm_flags |= VM_SPECIAL;
 	page_walk.mm = mm;
 	page_walk.private = vma;
