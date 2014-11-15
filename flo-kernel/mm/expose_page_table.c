@@ -55,8 +55,9 @@ SYSCALL_DEFINE3(expose_page_table,
 	}
 
 	vma->vm_flags |= VM_SPECIAL;
-
+	/* for pte_entries*/
 	page_walk.pmd_entry = walk_ptes;
+	/* for creating the fake pgd*/
 	page_walk.pud_entry = walk_pgds;
 	page_walk.mm = mm;
 	page_walk.private = vma;
