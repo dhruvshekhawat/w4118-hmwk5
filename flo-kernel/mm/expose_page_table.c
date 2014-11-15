@@ -55,12 +55,13 @@ SYSCALL_DEFINE3(expose_page_table,
 	}
 
 	vma->vm_flags |= VM_SPECIAL;
+
+	page_walk.pmd_entry = walk_ptes;
+	page_walk.pud_entry = walk_pgds;
 	page_walk.mm = mm;
 	page_walk.private = vma;
 
 	ret_code = walk_page_range(0, , &page_walk);
-
-	return ret_code;
 
 error:
 	up_write(tsk_mm->mmap_sem);
