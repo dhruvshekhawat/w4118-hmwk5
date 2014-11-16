@@ -68,9 +68,27 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 		goto error;
 	}
 
+	if (tsk_vma=>vm_end - addr < PAGE_SIZE) {
+		ret_code = -EINVAL;
+		goto error;
+	}
+
+	if (tsk_vma->vm_flags & (VM_WRITE | VM_SPECIAL)) {
+		ret_code = -EINVAL;
+		goto error;
+	}
+
 	if (tsk_vma->vm_file) {
 		struct inode *inode tsk_vma->vm_file->f_path.dentry->d_inode;
-		if (imajor(inode) != MEM_MAJOR)
+		/* Should we have more? This is for inode to be in /dev/zero*/
+		if (imajor(inode) != MEM_MAJOR) {
+			ret_code = -EINVAL;
+			goto error;
+		}
+	} else {
+		ret_code = -EINVAL;
+		goto error;
+	}
 
 	ret_code = walk_page_range(0, , &remap_pte);
 	vma->vm_flags |= VM_SPECIAL;
