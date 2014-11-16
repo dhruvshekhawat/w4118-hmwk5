@@ -9,8 +9,6 @@
 #include <sys/mman.h>
 #include <sys/types.h>
 
-#define expose_page_table(a, b, c) syscall(378, a, b, c)
-
 static int is_numeric(const char *s)
 {
 	char *p;
@@ -27,8 +25,13 @@ static int is_verbose(char *arg)
 	return strlen(arg) == 2 && strncmp(arg, "-v", 2) == 0;
 }
 
+#define PAGE_SIZE 					(4*1024)
+#define PGD_TABLE_SIZE 				(1024*PAGE_SIZE)
+#define expose_page_table(a, b, c) 	syscall(378, a, b, c)
+
 int main(int argc, char **argv)
 {
+	int i;
 	int fd;
 	int ret;
 	int pid = -1;
@@ -63,22 +66,28 @@ int main(int argc, char **argv)
 
 	fd = open("/dev/zero", O_RDONLY);
 	if (fd == -1) {
+		close(fd);
 		perror("open");
 		exit(EXIT_FAILURE);
 	}
 
-	addr = mmap(NULL, 1024, PROT_READ, MAP_PRIVATE, fd, 0);
+	addr = mmap(NULL, PGD_TABLE_SIZE*2, PROT_READ, MAP_PRIVATE, fd, 0);
 	if (addr == MAP_FAILED) {
 		perror("mmap");
 		exit(EXIT_FAILURE);
 	}
+	close(fd);
 
-	printf("%ld\n", addr);
+	printf("%p\n", addr);
 
 	ret = expose_page_table(pid, fake_pgd, addr);
 	if (ret != 0) {
 		perror("expose_page_table");
 		return ret;
+	}
+
+	for (i = 0; i < PGD_TABLE_SIZE; i++) {
+		// print pgd
 	}
 
 	return 0;
