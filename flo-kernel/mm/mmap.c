@@ -2732,10 +2732,7 @@ void __init mmap_init(void)
 	VM_BUG_ON(ret);
 }
 
-#ifdef PAGE_SIZE
-	#undef PAGE_SIZE
-#endif
-#define PAGE_SIZE 4096
+#define PAGE_SIZE_PTE 4096
 
 #ifdef DEBUG
 static int pte_debug_info(pte_t *pte, unsigned long addr, unsigned long end,
@@ -2744,7 +2741,7 @@ static int pte_debug_info(pte_t *pte, unsigned long addr, unsigned long end,
 	if (!pte)
 		return 0;
 
-	printk(KERNEL_ERR "%p %p %d\n", pte >> PAGE_SHIFT, addr, (pte & L_PTE_DIRTY) > 0);
+	printk(KERN_ERR "%p %p %d\n", pte >> PAGE_SHIFT, addr, (pte & L_PTE_DIRTY) > 0);
 	return 0;
 }
 #endif
@@ -2767,9 +2764,9 @@ static int remap_pte(pmd_t *pmd, unsigned long addr,
 
 	vma = (struct vm_area_struct *)walk->private;
 	pfn = page_to_pfn(pmd_page(*pmd));
-	target = vma->vm_start + (addr >> PMD_SHIFT) * PAGE_SIZE;
+	target = vma->vm_start + (addr >> PMD_SHIFT) * PAGE_SIZE_PTE;
 
-	rval = remap_pfn_range(vma, target, pfn, PAGE_SIZE, vma->vm_page_prot);
+	rval = remap_pfn_range(vma, target, pfn, PAGE_SIZE_PTE, vma->vm_page_prot);
 
 	return rval;
 }
@@ -2792,9 +2789,9 @@ static int map_fake_pgd(pud_t *pud, unsigned long addr,
 
 //	vma = (struct vm_area_struct *)walk->private;
 //	pfn = page_to_pfn(pud_page(*pud));
-//	target = vma->vm_start + (addr >> PUD_SHIFT) * PAGE_SIZE;
+//	target = vma->vm_start + (addr >> PUD_SHIFT) * PAGE_SIZE_PTE;
 //
-//	rval = remap_pfn_range(vma, target, pfn, PAGE_SIZE, vma->vm_page_prot);
+//	rval = remap_pfn_range(vma, target, pfn, PAGE_SIZE_PTE, vma->vm_page_prot);
         rval = -1;
 	return rval;
 }
@@ -2820,9 +2817,9 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 {
 	int rval;
 	struct inode *inode;
-	struct task_struct *tsk;
-	struct mm_struct *tsk_mm;
-	struct vm_area_struct *tsk_vma;
+	struct task_struct *target_tsk;
+	struct mm_struct *mm;
+	struct vm_area_struct *vma;
 	unsigned long end_vaddr;
 	struct fake_pgd *fpgd;
 	struct exposed_page_table *ept;
@@ -2835,61 +2832,92 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 		.pud_entry = map_fake_pgd,
 	};
 
-	if (addr & ~PAGE_MASK || fake_pgd & ~PAGE_MASK)
-		return -EINVAL;
+	printk(KERN_ERR "expose_page_table: %p\n", (void *) addr);
 
-	tsk = pid == -1 ? current : find_task_by_vpid(pid);
-	if (tsk == NULL)
+	if (addr & ~PAGE_MASK || fake_pgd & ~PAGE_MASK) {
+		printk(KERN_ERR "expose_page_table: "
+		       "addr or fake_pgd not page alligned...\n");
 		return -EINVAL;
+	}
 
-	tsk_mm = tsk->mm;
+	target_tsk = pid == -1 ? current : find_task_by_vpid(pid);
+	if (target_tsk == NULL){
+		printk(KERN_ERR "expose_page_table: Cannot find task with"
+		       "pid: %ld\n", (long) pid);
+		return -EINVAL;
+	}
+
+	mm = current->mm;
 
 	/* find the first vma after addr */
-	down_write(&tsk_mm->mmap_sem);
-	tsk_vma = find_vma(tsk_mm, addr);
-	if (tsk_vma == NULL) {
+	down_write(&mm->mmap_sem);
+	vma = find_vma(mm, fake_pgd);
+	if (vma == NULL) {
+		printk(KERN_ERR "expose_page_table: Cannot find VMA\n");
 		rval = -EFAULT;
 		goto error;
 	}
 
-	if (tsk_vma->vm_end - addr < PAGE_SIZE) {
+	if (vma->vm_end - fake_pgd < PAGE_SIZE_PTE) {
+		 printk(KERN_ERR "expose_page_table: addr %p exceeds limit\n",
+			addr);
 		rval = -EINVAL;
 		goto error;
 	}
 
-	if (tsk_vma->vm_flags & (VM_WRITE | VM_SPECIAL)) {
+	if (vma->vm_flags & (VM_WRITE)) {
+		printk(KERN_ERR "expose_page_table: VM_WRITE error\n");
 		rval = -EINVAL;
 		goto error;
 	}
 
-	if (tsk_vma->vm_file) {
-		inode = tsk_vma->vm_file->f_path.dentry->d_inode;
+	if (vma->vm_flags & (VM_SPECIAL)) {
+		printk(KERN_ERR "expose_page_table: VM_SPECIAL error\n");
+		rval = -EINVAL;
+		goto error;
+	}
+
+
+	if (vma->vm_file) {
+		inode = vma->vm_file->f_path.dentry->d_inode;
 		/* Should we have more? This is for inode to be in /dev/zero*/
 		if (imajor(inode) != MEM_MAJOR) {
+			printk(KERN_ERR "expose_page_table: d_iname: %s\n",
+			       vma->vm_file->f_path.dentry->d_iname);
+			printk(KERN_ERR "expose_page_table: addr not properly "
+			       "initialized %d %d\n", imajor(inode), MEM_MAJOR);
 			rval = -EINVAL;
 			goto error;
 		}
 	} else {
+		printk(KERN_ERR "expose_page_table: addr not mmap'ed to "
+		       "/dev/zero\n");
 		rval = -EINVAL;
 		goto error;
 	}
 	/* Be sure we do not access something outside of our vma*/
-	if (unlikely(addr != tsk_vma->vm_start)) {
-		rval = __split_vma(tsk_mm, tsk_vma, addr, 1);
-		if (rval)
+	if (unlikely(fake_pgd != vma->vm_start)) {
+		rval = __split_vma(mm, vma, addr, 1);
+		if (rval) {
+			printk(KERN_ERR "expose_page_table: __split_vma 1\n");
 			goto error;
+		}
 	}
 
-	if (unlikely(addr + EXPOSED_TABLE_SIZE != tsk_vma->vm_end)) {
-		rval = __split_vma(tsk_mm, tsk_vma, addr + EXPOSED_TABLE_SIZE, 0);
-		if (rval)
+	if (unlikely(fake_pgd + EXPOSED_TABLE_SIZE != vma->vm_end)) {
+		rval = __split_vma(mm, vma, addr + EXPOSED_TABLE_SIZE, 0);
+		if (rval) {
+			printk(KERN_ERR "expose_page_table: __split_vma 2\n");
 			goto error;
+		}
 	}
 
 	end_vaddr = TASK_SIZE_OF(tsk);
 
-	walk_pte.mm = tsk_mm;
-	walk_pte.private = tsk_vma;
+	walk_pte.mm = target_tsk->mm;
+	walk_pte.private = find_vma(mm, fake_pgd);//target_tsk->vma;
+	
+	printk(KERN_ERR "expose_page_table: ALL GOOD TILL HERE\n");
 	rval = walk_page_range(0, end_vaddr, &walk_pte);
 
 	ept = kmalloc(sizeof(struct exposed_page_table), GFP_KERNEL);
@@ -2898,7 +2926,7 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 		goto error;
 	}
 	ept->addr = addr;
-	list_add_tail(&ept->list, &tsk_mm->exposed_page_tables);
+	list_add_tail(&ept->list, &mm->exposed_page_tables);
 
 	fpgd = kmalloc(sizeof(struct fake_pgd), GFP_KERNEL);
 	if (fpgd == NULL) {
@@ -2906,20 +2934,16 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 		goto error;
 	}
 	fpgd->addr = addr;
-	list_add_tail(&fpgd->list, &tsk_mm->fake_pgds);
+	list_add_tail(&fpgd->list, &mm->fake_pgds);
 
 
 	/* Leverage VM_SPECIAL to prevent prot changes, vma merging,
 	 * shrinking and unmapping */
-	tsk_vma->vm_flags |= VM_SPECIAL;
+//	tsk_vma->vm_flags |= VM_SPECIAL;
 
 
 	rval = 0;
 error:
-	up_write(&tsk_mm->mmap_sem);
+	up_write(&mm->mmap_sem);
 	return rval;
 }
-
-
-#undef PAGE_SIZE
-
