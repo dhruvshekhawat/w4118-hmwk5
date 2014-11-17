@@ -11,10 +11,18 @@
 #include <asm/uaccess.h>
 #include <asm/current.h>
 
+#ifdef _DEBUG
+static int pte_debug_info(pte_t *pte, unsigned long addr, unsigned long end,
+			  struct mm_walk *walk)
+{
+	/* print debug */
+	return 0;
+}
+#endif
 
 /* Helper to...
  *
- * @pmd:  
+ * @pmd:
  * @addr: starting address
  * @end:  ending address
  * @walk: set of callbacks to invoke for each level of the tree
@@ -23,7 +31,19 @@
 static int remap_pte(pmd_t *pmd, unsigned long addr,
 		     unsigned long end, struct mm_walk *walk)
 {
+	int rval;
+	unsigned long pfn;
+	unsigned long target;
+	struct vm_area_struct *vma;
+	
+	vma = (struct vm_area_struct *)walk->private;
+	pfn = page_to_pfn(pmd_page(*pmd));
+	target = /* fetch  target */
 
+	rval = 0;
+	rval = remap_pfn_range(vma, target, pfn, PAGE_SIZE, vma->vm_page_prot);
+
+	return rval
 }
 
 
@@ -53,8 +73,12 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 	struct vm_area_struct *tsk_vma;
 	struct mm_walk walk_pte = {
 		.mm = tsk->mm,
-		.pte_entry = remap_pte,
-		.pud_entry = remap_pgd,
+#ifndef _DEBUG
+		.pte_entry = pte_debug_info
+#endif
+		.pmd_entry = remap_pte,
+		.pud_entry = fake_pgd,
+		.private = vma,
 	};
 
 	if (addr & ~PAGE_MASK || fake_pgd & ~PAGE_MASK)
