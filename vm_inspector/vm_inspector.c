@@ -99,9 +99,9 @@ int main(int argc, char **argv)
 	for (i = 0; i < PGD_TABLE_SIZE; i++) {
 		vma = addr[i*4*1024]; /* TODO not sure if this is correct */
 		if (vma == 0)
-			printf("%p %p %p %d %d %d %d %d\n", i, virt(vma), phys(vma),
-												filebit(vma), dirtybit(vma),
-												readonlybit(vma), xnbit(vma));
+			printf("%p %p %p %d %d %d %d %d\n", i, virt(vma), 
+				phys(vma), filebit(vma), dirtybit(vma),
+				readonlybit(vma), xnbit(vma));
 		else if (vflag)
 			printf("%p %p 0 0 0 0 0 0", index(vma), virt(vma));
 	}
