@@ -43,7 +43,7 @@ static int remap_pte(pmd_t *pmd, unsigned long addr,
 	rval = 0;
 	rval = remap_pfn_range(vma, target, pfn, PAGE_SIZE, vma->vm_page_prot);
 
-	return rval
+	return rval;
 }
 
 
@@ -77,8 +77,7 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 		.pte_entry = pte_debug_info
 #endif
 		.pmd_entry = remap_pte,
-		.pud_entry = fake_pgd,
-		.private = vma,
+		.pud_entry = remap_pgd,
 	};
 
 	if (addr & ~PAGE_MASK || fake_pgd & ~PAGE_MASK)
