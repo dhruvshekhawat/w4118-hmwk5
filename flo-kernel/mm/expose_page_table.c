@@ -26,7 +26,8 @@ static int remap_pte(pmd_t *pmd, unsigned long addr,
 }
 
 
-/* Map a target process's page table into address space of the current process.
+/*
+ * Map a target process's page table into address space of the current process.
  *
  * After successfully completing this call, addr will contain the
  * page tables of the target process. To make it efficient for referencing
@@ -38,18 +39,21 @@ static int remap_pte(pmd_t *pmd, unsigned long addr,
  *       dump the current process's page tables
  * @fake_pgd: base address of the fake pgd table
  * @addr: base address in the user space that the page tables should map to
+ *
+ * NOTE: addr should be mmap'ed from user space at /dev/zero
  */
 SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 		unsigned long, addr)
 {
-	int ret_code = 0;
+	int rval;
+	struct inode *inode;
 	struct task_struct *tsk;
 	struct mm_struct *tsk_mm;
 	struct vm_area_struct *tsk_vma;
-
 	struct mm_walk walk = {
 		.mm = tsk->mm,
 		.pde_entry = remap_pte,
+		.pud_entry = fake_pgd,
 		.private = vma,
 	};
 
@@ -61,39 +65,41 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 		return -EINVAL;
 	
 	tsk_mm = tsk->mm;
+
+	/* find the first vma after addr */
 	down_write(tsk_mm->mmap_sem);
 	vma = find_vma(tsk_mm,addr);
 	if (vma == NULL) {
-		ret_code = -EFAULT;
+		rval = -EFAULT;
 		goto error;
 	}
-
-	if (tsk_vma=>vm_end - addr < PAGE_SIZE) {
-		ret_code = -EINVAL;
+	
+	if (tsk_vma->vm_end - addr < PAGE_SIZE) {
+		rval = -EINVAL;
 		goto error;
 	}
 
 	if (tsk_vma->vm_flags & (VM_WRITE | VM_SPECIAL)) {
-		ret_code = -EINVAL;
+		rval = -EINVAL;
 		goto error;
 	}
 
 	if (tsk_vma->vm_file) {
-		struct inode *inode tsk_vma->vm_file->f_path.dentry->d_inode;
+		inode = tsk_vma->vm_file->f_path.dentry->d_inode;
 		/* Should we have more? This is for inode to be in /dev/zero*/
 		if (imajor(inode) != MEM_MAJOR) {
-			ret_code = -EINVAL;
+			rval = -EINVAL;
 			goto error;
 		}
 	} else {
-		ret_code = -EINVAL;
+		rval = -EINVAL;
 		goto error;
 	}
 
-	ret_code = walk_page_range(0, , &remap_pte);
-	vma->vm_flags |= VM_SPECIAL;
+	rval = walk_page_range(0, , &remap_pte);
 	
+	rval = 0;
 error:
 	up_write(&tsk_mm->mmap_sem);
-	return ret_code;
+	return rval;
 }
