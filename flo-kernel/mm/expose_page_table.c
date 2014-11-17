@@ -7,6 +7,7 @@
  */
 #include <asm-generic/errno-base.h>
 #include <linux/syscalls.h>
+#include <linux/major.h>
 #include <asm/uaccess.h>
 #include <asm/current.h>
 
@@ -50,26 +51,25 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 	struct task_struct *tsk;
 	struct mm_struct *tsk_mm;
 	struct vm_area_struct *tsk_vma;
-	struct mm_walk walk = {
+	struct mm_walk walk_pte = {
 		.mm = tsk->mm,
-		.pde_entry = remap_pte,
-		.pud_entry = fake_pgd,
-		.private = vma,
+		.pte_entry = remap_pte,
+		.pud_entry = remap_pgd,
 	};
 
 	if (addr & ~PAGE_MASK || fake_pgd & ~PAGE_MASK)
 		return -EINVAL;
 
-	tsk = pid == -1 ? current : find_task_by_vpid(pid)
+	tsk = pid == -1 ? current : find_task_by_vpid(pid);
 	if (tsk == NULL)
 		return -EINVAL;
 	
 	tsk_mm = tsk->mm;
 
 	/* find the first vma after addr */
-	down_write(tsk_mm->mmap_sem);
-	vma = find_vma(tsk_mm,addr);
-	if (vma == NULL) {
+	down_write(&tsk_mm->mmap_sem);
+	tsk_vma = find_vma(tsk_mm,addr);
+	if (tsk_vma == NULL) {
 		rval = -EFAULT;
 		goto error;
 	}
@@ -96,7 +96,8 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 		goto error;
 	}
 
-	rval = walk_page_range(0, , &remap_pte);
+	walk_pte.private = tsk_vma;
+	//rval = walk_page_range(0, , &walk_pte);
 	
 	rval = 0;
 error:
