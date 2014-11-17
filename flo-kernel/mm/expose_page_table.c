@@ -11,7 +11,7 @@
 #include <asm/uaccess.h>
 #include <asm/current.h>
 
-#ifdef _DEBUG
+#ifdef DEBUG
 static int pte_debug_info(pte_t *pte, unsigned long addr, unsigned long end,
 			  struct mm_walk *walk)
 {
@@ -73,7 +73,7 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 	struct vm_area_struct *tsk_vma;
 	struct mm_walk walk_pte = {
 		.mm = tsk->mm,
-#ifndef _DEBUG
+#ifdef DEBUG
 		.pte_entry = pte_debug_info
 #endif
 		.pmd_entry = remap_pte,
