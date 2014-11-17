@@ -42,10 +42,13 @@ int main(int argc, char **argv)
 	int fd;
 	int ret;
 	int pid = -1;
-	int vflag = 0;
-	unsigned long vma;
-	unsigned long *addr;
-	unsigned long *fake_pgd;
+	int verbose;
+//	unsigned long vma;
+//	unsigned long *addr;
+	unsigned long fake_pgd;
+	unsigned long accessed;
+
+	verbose = 0;
 
 	if (argc != 2 && argc != 3) {
 		printf("Usage:%s [-v] [pid]\n", argv[0]);
@@ -61,10 +64,10 @@ int main(int argc, char **argv)
 		}
 	} else if (argc == 3) {
 		if (is_numeric(argv[1]) && is_verbose(argv[2])) {
-			vflag = 1;
+			verbose = 1;
 			pid = atoi(argv[1]);
 		} else if (is_verbose(argv[1]) && is_numeric(argv[2])) {
-			vflag = 1;
+			verbose = 1;
 			pid = atoi(argv[2]);
 		} else {
 			printf("usage: %s [-v] [pid]\n", argv[0]);
@@ -79,33 +82,44 @@ int main(int argc, char **argv)
 		exit(EXIT_FAILURE);
 	}
 
-	fake_pgd = mmap(NULL, PGD_TABLE_SIZE*2, PROT_READ, MAP_PRIVATE, fd, 0);
-	if (fake_pgd == MAP_FAILED) {
+	fake_pgd = (unsigned long) mmap(NULL, 2 * 4 * 1024 * 1024, PROT_READ, MAP_SHARED, fd, 0);
+	if (fake_pgd == (unsigned long) NULL) {
 		perror("mmap");
 		close(fd);
 		exit(EXIT_FAILURE);
 	}
 	close(fd);
 
-	printf("%p\n", fake_pgd);
 
-	addr = fake_pgd+PGD_TABLE_SIZE;
-	ret = expose_page_table(pid, fake_pgd, addr);
+
+
+	for (i = 0; i < PGD_TABLE_SIZE / sizeof(unsigned long); i++) {
+		accessed = (unsigned long)((unsigned long *) fake_pgd + i);
+	}
+	(void) accessed;
+
+	printf("fake_pgd:%p\n", (void *)fake_pgd);
+	printf("addr:%p\n", (void *) (fake_pgd + PGD_TABLE_SIZE));
+
+	ret = 0;
+	printf("%ld %d %p\n", (long)pid, ret, (void *) (fake_pgd + PGD_TABLE_SIZE));
+	
+	ret = expose_page_table(pid, fake_pgd, fake_pgd + PGD_TABLE_SIZE);
 	if (ret != 0) {
-		perror("expose_page_table");
+		perror("syscall: ");
 		return ret;
 	}
-
-	for (i = 0; i < PGD_TABLE_SIZE; i++) {
-		vma = addr[i*4*1024]; /* TODO not sure if this is correct */
-		if (vma == 0)
-			printf("%p %p %p %d %d %d %d %d\n",
-				i, virt(vma), phys(vma),
-				filebit(vma), dirtybit(vma),
-				readonlybit(vma), xnbit(vma));
-		else if (vflag)
-			printf("%p %p 0 0 0 0 0 0", index(vma), virt(vma));
-	}
+	(void) verbose;
+//	for (i = 0; i < PGD_TABLE_SIZE; i++) {
+//		vma = addr[i*4*1024]; /* TODO not sure if this is correct */
+//		if (vma == 0)
+//			printf("%p %p %p %d %d %d %d %d\n",
+//				i, virt(vma), phys(vma),
+//				filebit(vma), dirtybit(vma),
+//				readonlybit(vma), xnbit(vma));
+//		else if (verbose)
+//			printf("%p %p 0 0 0 0 0 0", index(vma), virt(vma));
+//	}
 
 	return 0;
 }
