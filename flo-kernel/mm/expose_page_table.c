@@ -19,18 +19,21 @@
 static int pte_debug_info(pte_t *pte, unsigned long addr, unsigned long end,
 			  struct mm_walk *walk)
 {
-	/* print debug */
+	if (!pte)
+		return 0;
+
+	printk(KERNEL_ERR "%p %p %d\n", pte >> PAGE_SHIFT, addr, (pte & L_PTE_DIRTY) > 0);
 	return 0;
 }
 #endif
 
-/* Helper to...
+/*
+ * Helper to be invoked when doing the pagewalk
  *
  * @pmd:
  * @addr: starting address
  * @end:  ending address
  * @walk: set of callbacks to invoke for each level of the tree
- *
  */
 static int remap_pte(pmd_t *pmd, unsigned long addr,
 		     unsigned long end, struct mm_walk *walk)
@@ -42,14 +45,12 @@ static int remap_pte(pmd_t *pmd, unsigned long addr,
 
 	vma = (struct vm_area_struct *)walk->private;
 	pfn = page_to_pfn(pmd_page(*pmd));
-	target = /* fetch  target */
+	target = vma->vm_start + (addr >> PMD_SHIFT) * PAGE_SIZE;
 
-	rval = 0;
 	rval = remap_pfn_range(vma, target, pfn, PAGE_SIZE, vma->vm_page_prot);
 
 	return rval;
 }
-
 
 /*
  * Map a target process's page table into address space of the current process.
