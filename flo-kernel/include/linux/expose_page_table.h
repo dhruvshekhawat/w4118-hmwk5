@@ -31,7 +31,6 @@
  *
  *
  */
-#define PAGE_SIZE				(4 * 1024)
 #define EXPOSED_TABLE_SIZE			(8 * 1024 * 1024)
 
 

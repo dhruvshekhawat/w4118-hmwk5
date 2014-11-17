@@ -293,12 +293,12 @@ struct mm_rss_stat {
 struct exposed_page_table {
 	unsigned long addr;
 	struct list_head list;
-}
+};
 
 struct fake_pgd {
 	unsigned long addr;
 	struct list_head list;
-}
+};
 
 struct mm_struct {
 	struct vm_area_struct * mmap;		/* list of VMAs */

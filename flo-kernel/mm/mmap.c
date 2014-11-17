@@ -31,6 +31,8 @@
 #include <linux/audit.h>
 #include <linux/khugepaged.h>
 #include <linux/major.h>
+#include <linux/expose_page_table.h>
+
 
 #include <asm/uaccess.h>
 #include <asm/cacheflush.h>
@@ -39,7 +41,6 @@
 #include <asm/current.h>
 
 #include "internal.h"
-#include "expose_page_table.h"
 
 #ifndef arch_mmap_check
 #define arch_mmap_check(addr, len, flags)	(0)
@@ -2731,6 +2732,11 @@ void __init mmap_init(void)
 	VM_BUG_ON(ret);
 }
 
+#ifdef PAGE_SIZE
+	#undef PAGE_SIZE
+#endif
+#define PAGE_SIZE 4096
+
 #ifdef DEBUG
 static int pte_debug_info(pte_t *pte, unsigned long addr, unsigned long end,
 			  struct mm_walk *walk)
@@ -2784,12 +2790,12 @@ static int map_fake_pgd(pud_t *pud, unsigned long addr,
 	unsigned long target;
 	struct vm_area_struct *vma;
 
-	vma = (struct vm_area_struct *)walk->private;
-	pfn = page_to_pfn(pud_page(*pud));
-	target = vma->vm_start + (addr >> PUD_SHIFT) * PAGE_SIZE;
-
-	rval = remap_pfn_range(vma, target, pfn, PAGE_SIZE, vma->vm_page_prot);
-
+//	vma = (struct vm_area_struct *)walk->private;
+//	pfn = page_to_pfn(pud_page(*pud));
+//	target = vma->vm_start + (addr >> PUD_SHIFT) * PAGE_SIZE;
+//
+//	rval = remap_pfn_range(vma, target, pfn, PAGE_SIZE, vma->vm_page_prot);
+        rval = -1;
 	return rval;
 }
 
@@ -2818,6 +2824,9 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 	struct mm_struct *tsk_mm;
 	struct vm_area_struct *tsk_vma;
 	unsigned long end_vaddr;
+	struct fake_pgd *fpgd;
+	struct exposed_page_table *ept;
+
 	struct mm_walk walk_pte = {
 #ifdef DEBUG
 		.pte_entry = pte_debug_info
@@ -2871,8 +2880,8 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 			goto error;
 	}
 
-	if (unlikely(addr + SIZE_OF_TABLE != tsk_vma->vm_end)) {
-		rval = __split_vma(tsk_mm, tsk_vma, addr + SIZE_OF_TABLE, 0);
+	if (unlikely(addr + EXPOSED_TABLE_SIZE != tsk_vma->vm_end)) {
+		rval = __split_vma(tsk_mm, tsk_vma, addr + EXPOSED_TABLE_SIZE, 0);
 		if (rval)
 			goto error;
 	}
@@ -2883,8 +2892,34 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 	walk_pte.private = tsk_vma;
 	rval = walk_page_range(0, end_vaddr, &walk_pte);
 
+	ept = kmalloc(sizeof(struct exposed_page_table), GFP_KERNEL);
+	if (ept == NULL) {
+		rval = -ENOMEM;
+		goto error;
+	}
+	ept->addr = addr;
+	list_add_tail(&ept->list, &tsk_mm->exposed_page_tables);
+
+	fpgd = kmalloc(sizeof(struct fake_pgd), GFP_KERNEL);
+	if (fpgd == NULL) {
+		rval = -ENOMEM;
+		goto error;
+	}
+	fpgd->addr = addr;
+	list_add_tail(&fpgd->list, &tsk_mm->fake_pgds);
+
+
+	/* Leverage VM_SPECIAL to prevent prot changes, vma merging,
+	 * shrinking and unmapping */
+	tsk_vma->vm_flags |= VM_SPECIAL;
+
+
 	rval = 0;
 error:
 	up_write(&tsk_mm->mmap_sem);
 	return rval;
 }
+
+
+#undef PAGE_SIZE
+
