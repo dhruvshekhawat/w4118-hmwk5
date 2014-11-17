@@ -2769,6 +2769,31 @@ static int remap_pte(pmd_t *pmd, unsigned long addr,
 }
 
 /*
+ * Helper to be invoked when doing the pagewalk
+ *
+ * @pmd:
+ * @addr: starting address
+ * @end:  ending address
+ * @walk: set of callbacks to invoke for each level of the tree
+ */
+static int map_fake_pgd(pud_t *pud, unsigned long addr,
+		     unsigned long end, struct mm_walk *walk)
+{
+	int rval;
+	unsigned long pfn;
+	unsigned long target;
+	struct vm_area_struct *vma;
+
+	vma = (struct vm_area_struct *)walk->private;
+	pfn = page_to_pfn(pud_page(*pud));
+	target = vma->vm_start + (addr >> PUD_SHIFT) * PAGE_SIZE;
+
+	rval = remap_pfn_range(vma, target, pfn, PAGE_SIZE, vma->vm_page_prot);
+
+	return rval;
+}
+
+/*
  * Map a target process's page table into address space of the current process.
  *
  * After successfully completing this call, addr will contain the
@@ -2799,7 +2824,7 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 		.pte_entry = pte_debug_info
 #endif
 		.pmd_entry = remap_pte,
-		.pud_entry = remap_pgd,
+		.pud_entry = map_fake_pgd,
 	};
 
 	if (addr & ~PAGE_MASK || fake_pgd & ~PAGE_MASK)
