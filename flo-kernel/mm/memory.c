@@ -570,9 +570,37 @@ void free_pgtables(struct mmu_gather *tlb, struct vm_area_struct *vma,
 	}
 }
 
+/*
+ * Helper to keep updated all user space expored remappings
+ */
+static void remap_pte(struct mm_struct *mm, struct exposed_page_table *tbl,
+		      pmd_t *pmd, unsigned long addr)
+{
+	int rval;
+	unsigned long pfn;
+	unsigned long target;
+	struct vm_area_struct *vma;
+	
+	pfn = page_to_pfn(pmd_page(*pmd));
+	target = vma->vm_start + (addr >> PMD_SHIFT) * PAGE_SIZE;
+	vma = find_vma(mm, tbl->addr);
+	
+	printk(KERN_ERR "remap_pte: Mapping pte %p to pfn %p (addr=0x%p)\n",
+	       (void *) target, (void *) pfn, (void *) addr);
+
+	rval = remap_pfn_range(vma, target, pfn, PAGE_SIZE, vma->vm_page_prot);
+	if (rval < 0)
+		printk(KERN_ERR " - - - FAILED!\n");
+	else
+		printk(KERN_ERR " - - - SUCCEDED!\n");
+	return;
+}
+
 int __pte_alloc(struct mm_struct *mm, struct vm_area_struct *vma,
 		pmd_t *pmd, unsigned long address)
 {
+	struct exposed_page_table *p;
+
 	pgtable_t new = pte_alloc_one(mm, address);
 	int wait_split_huge_page;
 	if (!new)
@@ -599,6 +627,14 @@ int __pte_alloc(struct mm_struct *mm, struct vm_area_struct *vma,
 		mm->nr_ptes++;
 		pmd_populate(mm, pmd, new);
 		new = NULL;
+
+		/*
+		 * OK, here seems a good place to keep up-to-data our 
+		 * user-space exposed remappings
+		 */
+		list_for_each_entry(p, &mm->exposed_page_tables, list)
+			remap_pte(mm, p, pmd, address);
+
 	} else if (unlikely(pmd_trans_splitting(*pmd)))
 		wait_split_huge_page = 1;
 	spin_unlock(&mm->page_table_lock);
