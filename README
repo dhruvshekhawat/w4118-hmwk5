@@ -1,6 +1,6 @@
 E. Atlidakis, G. Koloventzos, A. Papancea
 UNI: ea2615, gk2409, alp2200
-Last updated: 11/12/2014
+Last updated: 11/16/2014
 
 ASSUMPTIONS:
 
@@ -23,6 +23,9 @@ MODIFIED/ADDED FILES:
 - flo-kernel/kernel/Makefile
   added expose_page_table.o binary to kernel Makefile
 
+- vm_inspector/vm_inspector.c
+  the test program that prints out the fake pgd of the given pid
+
 RESOURCES USED:
 
 1. Linux Cross Reference
@@ -31,3 +34,5 @@ RESOURCES USED:
 2. Linux Kernel Development (3rd Edition)
 
 3. Operating Systems: Principles and Practice (2nd Edition)
+
+4. Manual page for mmap

@@ -25,9 +25,16 @@ static int is_verbose(char *arg)
 	return strlen(arg) == 2 && strncmp(arg, "-v", 2) == 0;
 }
 
-#define PAGE_SIZE 					(4*1024)
-#define PGD_TABLE_SIZE 				(1024*PAGE_SIZE)
-#define expose_page_table(a, b, c) 	syscall(378, a, b, c)
+#define PAGE_SIZE					(4*1024)
+#define PGD_TABLE_SIZE				(1024*PAGE_SIZE)
+#define expose_page_table(a, b, c)	syscall(378, a, b, c)
+/* TODO IMPLEMENT BELOW */
+#define virt(vma)					0
+#define phys(vma)					0
+#define filebit(vma)				0
+#define dirtybit(vma)				0
+#define readonlybit(vma)			0
+#define xnbit(vma)					0
 
 int main(int argc, char **argv)
 {
@@ -36,6 +43,7 @@ int main(int argc, char **argv)
 	int ret;
 	int pid = -1;
 	int vflag = 0;
+	unsigned long vma;
 	unsigned long *addr;
 	unsigned long *fake_pgd;
 
@@ -71,15 +79,17 @@ int main(int argc, char **argv)
 		exit(EXIT_FAILURE);
 	}
 
-	addr = mmap(NULL, PGD_TABLE_SIZE*2, PROT_READ, MAP_PRIVATE, fd, 0);
-	if (addr == MAP_FAILED) {
+	fake_pgd = mmap(NULL, PGD_TABLE_SIZE*2, PROT_READ, MAP_PRIVATE, fd, 0);
+	if (fake_pgd == MAP_FAILED) {
 		perror("mmap");
+		close(fd);
 		exit(EXIT_FAILURE);
 	}
 	close(fd);
 
-	printf("%p\n", addr);
+	printf("%p\n", fake_pgd);
 
+	addr = fake_pgd+PGD_TABLE_SIZE;
 	ret = expose_page_table(pid, fake_pgd, addr);
 	if (ret != 0) {
 		perror("expose_page_table");
@@ -87,7 +97,13 @@ int main(int argc, char **argv)
 	}
 
 	for (i = 0; i < PGD_TABLE_SIZE; i++) {
-		// print pgd
+		vma = addr[i*4*1024]; /* TODO not sure if this is correct */
+		if (vma == 0)
+			printf("%p %p %p %d %d %d %d %d\n", i, virt(vma), phys(vma),
+												filebit(vma), dirtybit(vma),
+												readonlybit(vma), xnbit(vma));
+		else if (vflag)
+			printf("%p %p 0 0 0 0 0 0", index(vma), virt(vma));
 	}
 
 	return 0;
