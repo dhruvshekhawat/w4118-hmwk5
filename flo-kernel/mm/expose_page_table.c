@@ -10,6 +10,10 @@
 #include <linux/major.h>
 #include <asm/uaccess.h>
 #include <asm/current.h>
+#define PAGE_SIZE				(4*1024)
+#define PGD_TABLE_SIZE				(1024*PAGE_SIZE)
+#define SIZE_OF_TABLE				(2*PGD_TABLE_SIZE)
+
 
 #ifdef DEBUG
 static int pte_debug_info(pte_t *pte, unsigned long addr, unsigned long end,
@@ -120,9 +124,21 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 		rval = -EINVAL;
 		goto error;
 	}
+	/* Be sure we do not access something outside of our vma*/
+	if (unlikely(addr != tsk_vma->vm_start)) {
+		rval = __split_vma(tsk_mm, tsk_vma, addr, 1);
+		if (rval)
+			goto error;
+	}
+
+	if (unlikely(addr + SIZE_OF_TABLE != tsk_vma->vm_end)) {
+		rval = __split_vma(mm, vma, addr + SIZE_OF_TABLE, 0);
+		if (rval)
+			goto error;
+	}
 
 	walk_pte.private = tsk_vma;
-	//rval = walk_page_range(0, , &walk_pte);
+	rval = walk_page_range(0, end_vaddr, &walk_pte);
 
 	rval = 0;
 error:
