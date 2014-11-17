@@ -87,6 +87,8 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 	if (tsk == NULL)
 		return -EINVAL;
 	
+	const unsigned long end_vaddr = TASK_SIZE_OF(tsk);
+
 	tsk_mm = tsk->mm;
 
 	/* find the first vma after addr */
