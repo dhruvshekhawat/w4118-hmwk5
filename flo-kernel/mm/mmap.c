@@ -2819,7 +2819,6 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 	struct vm_area_struct *tsk_vma;
 	unsigned long end_vaddr;
 	struct mm_walk walk_pte = {
-		.mm = tsk->mm,
 #ifdef DEBUG
 		.pte_entry = pte_debug_info
 #endif
@@ -2880,6 +2879,7 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 
 	end_vaddr = TASK_SIZE_OF(tsk);
 
+	walk_pte.mm = tsk_mm;
 	walk_pte.private = tsk_vma;
 	rval = walk_page_range(0, end_vaddr, &walk_pte);
 
