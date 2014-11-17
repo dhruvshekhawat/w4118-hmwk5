@@ -519,6 +519,9 @@ static struct mm_struct *mm_init(struct mm_struct *mm, struct task_struct *p)
 	mm_init_aio(mm);
 	mm_init_owner(mm, p);
 
+	INIT_LIST_HEAD(&mm->exposed_page_tables);
+	INIT_LIST_HEAD(&mm->fake_pdgs);
+
 	if (likely(!mm_alloc_pgd(mm))) {
 		mm->def_flags = 0;
 		mmu_notifier_mm_init(mm);

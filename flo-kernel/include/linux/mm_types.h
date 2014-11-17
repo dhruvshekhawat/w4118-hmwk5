@@ -290,8 +290,20 @@ struct mm_rss_stat {
 	atomic_long_t count[NR_MM_COUNTERS];
 };
 
+struct exposed_page_table {
+	unsigned long addr;
+	struct list_head list;
+}
+
+struct fake_pgd {
+	unsigned long addr;
+	struct list_head list;
+}
+
 struct mm_struct {
 	struct vm_area_struct * mmap;		/* list of VMAs */
+	struct list_head exposed_page_tables;
+	struct list_head fake_pgds;
 	struct rb_root mm_rb;
 	struct vm_area_struct * mmap_cache;	/* last find_vma result */
 #ifdef CONFIG_MMU
