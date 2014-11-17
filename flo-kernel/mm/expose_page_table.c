@@ -35,7 +35,7 @@ static int remap_pte(pmd_t *pmd, unsigned long addr,
 	unsigned long pfn;
 	unsigned long target;
 	struct vm_area_struct *vma;
-	
+
 	vma = (struct vm_area_struct *)walk->private;
 	pfn = page_to_pfn(pmd_page(*pmd));
 	target = /* fetch  target */
@@ -86,19 +86,19 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 	tsk = pid == -1 ? current : find_task_by_vpid(pid);
 	if (tsk == NULL)
 		return -EINVAL;
-	
+
 	const unsigned long end_vaddr = TASK_SIZE_OF(tsk);
 
 	tsk_mm = tsk->mm;
 
 	/* find the first vma after addr */
 	down_write(&tsk_mm->mmap_sem);
-	tsk_vma = find_vma(tsk_mm,addr);
+	tsk_vma = find_vma(tsk_mm, addr);
 	if (tsk_vma == NULL) {
 		rval = -EFAULT;
 		goto error;
 	}
-	
+
 	if (tsk_vma->vm_end - addr < PAGE_SIZE) {
 		rval = -EINVAL;
 		goto error;
@@ -123,7 +123,7 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 
 	walk_pte.private = tsk_vma;
 	//rval = walk_page_range(0, , &walk_pte);
-	
+
 	rval = 0;
 error:
 	up_write(&tsk_mm->mmap_sem);
