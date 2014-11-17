@@ -25,16 +25,16 @@ static int is_verbose(char *arg)
 	return strlen(arg) == 2 && strncmp(arg, "-v", 2) == 0;
 }
 
-#define PAGE_SIZE					(4*1024)
-#define PGD_TABLE_SIZE				(1024*PAGE_SIZE)
+#define PAGE_SIZE			(4*1024)
+#define PGD_TABLE_SIZE			(1024*PAGE_SIZE)
 #define expose_page_table(a, b, c)	syscall(378, a, b, c)
 /* TODO IMPLEMENT BELOW */
-#define virt(vma)					0
-#define phys(vma)					0
-#define filebit(vma)				0
-#define dirtybit(vma)				0
-#define readonlybit(vma)			0
-#define xnbit(vma)					0
+#define virt(vma)			0
+#define phys(vma)			0
+#define filebit(vma)			0
+#define dirtybit(vma)			0
+#define readonlybit(vma)		0
+#define xnbit(vma)			0
 
 int main(int argc, char **argv)
 {
@@ -99,8 +99,9 @@ int main(int argc, char **argv)
 	for (i = 0; i < PGD_TABLE_SIZE; i++) {
 		vma = addr[i*4*1024]; /* TODO not sure if this is correct */
 		if (vma == 0)
-			printf("%p %p %p %d %d %d %d %d\n", i, virt(vma), 
-				phys(vma), filebit(vma), dirtybit(vma),
+			printf("%p %p %p %d %d %d %d %d\n",
+				i, virt(vma), phys(vma),
+				filebit(vma), dirtybit(vma),
 				readonlybit(vma), xnbit(vma));
 		else if (vflag)
 			printf("%p %p 0 0 0 0 0 0", index(vma), virt(vma));
