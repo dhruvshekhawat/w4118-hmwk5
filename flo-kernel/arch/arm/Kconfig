@@ -168,6 +168,9 @@ config RWSEM_XCHGADD_ALGORITHM
 config ARCH_HAS_ILOG2_U32
 	bool
 
+config REMAP_DEBUG
+	bool
+
 config ARCH_HAS_ILOG2_U64
 	bool
 
