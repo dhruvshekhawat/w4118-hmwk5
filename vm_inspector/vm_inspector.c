@@ -20,7 +20,7 @@ static int is_numeric(const char *s)
 	return *p == '\0';
 }
 
-static int is_verbose(char *arg)
+static inline int is_verbose(char *arg)
 {
 	return strlen(arg) == 2 && strncmp(arg, "-v", 2) == 0;
 }
@@ -48,21 +48,31 @@ int main(int argc, char **argv)
 	unsigned long fake_pgd;
 	unsigned long accessed;
 
-	verbose = 0;
 
 	if (argc != 2 && argc != 3) {
 		printf("Usage:%s [-v] [pid]\n", argv[0]);
 		return -1;
 	}
 
-	if (argc == 2) {
-		if (is_numeric(argv[1])) {
+	verbose = 0;
+
+	if (argc == 2) { 
+		/*
+		 * If given one argument, check whether it is "-v" or
+		 * a pid? If not, set pid equal to -1 in order to
+		 * tract the current process.
+		 */
+		if (is_verbose(argv[1]))
+			verbose = 1;
+		else if (is_numeric(argv[1]))
 			pid = atoi(argv[1]);
-		} else {
-			printf("Usage:%s [-v] [pid]\n", argv[0]);
-			return -1;
-		}
+		else
+			pid = -1;
 	} else if (argc == 3) {
+		/*
+		 * If given twho arguments, try to match vebose
+		 * and pid. If fail, arguments are malformed.
+		 */
 		if (is_numeric(argv[1]) && is_verbose(argv[2])) {
 			verbose = 1;
 			pid = atoi(argv[1]);
@@ -75,22 +85,23 @@ int main(int argc, char **argv)
 		}
 	}
 
+	/*
+	 * TODO: Remove this and ise MAP_PRIVATE...
+	 */
 	fd = open("/dev/zero", O_RDONLY);
 	if (fd == -1) {
 		close(fd);
 		perror("open");
-		exit(EXIT_FAILURE);
+		return -1;
 	}
-
 	fake_pgd = (unsigned long) mmap(NULL, 2 * 4 * 1024 * 1024, PROT_READ, MAP_SHARED, fd, 0);
+
 	if (fake_pgd == (unsigned long) NULL) {
 		perror("mmap");
 		close(fd);
-		exit(EXIT_FAILURE);
+		return -1;
 	}
 	close(fd);
-
-
 
 
 	for (i = 0; i < PGD_TABLE_SIZE / sizeof(unsigned long); i++) {
