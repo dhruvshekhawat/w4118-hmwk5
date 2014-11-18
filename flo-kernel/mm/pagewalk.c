@@ -46,8 +46,10 @@ again:
 		 * This implies that each ->pmd_entry() handler
 		 * needs to know about pmd_trans_huge() pmds
 		 */
-		if (walk->pmd_entry)
+		if (walk->pmd_entry) {
 			err = walk->pmd_entry(pmd, addr, next, walk);
+			printk(KERN_ERR "walk_pmd_range: %p\n", walk->pmd_entry);
+		}
 		if (err)
 			break;
 

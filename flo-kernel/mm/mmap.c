@@ -2734,7 +2734,7 @@ void __init mmap_init(void)
 
 #define PAGE_SIZE_PTE 4096
 
-#ifdef DEBUG
+#ifdef CONFIG_REMAP_DEBUG
 static int pte_debug_info(pte_t *pte, unsigned long addr, unsigned long end,
 			  struct mm_walk *walk)
 {
@@ -2746,55 +2746,57 @@ static int pte_debug_info(pte_t *pte, unsigned long addr, unsigned long end,
 }
 #endif
 
-/*
- * Helper to be invoked when doing the pagewalk
- *
- * @pmd:
- * @addr: starting address
- * @end:  ending address
- * @walk: set of callbacks to invoke for each level of the tree
- */
-static int remap_pte(pmd_t *pmd, unsigned long addr,
-		     unsigned long end, struct mm_walk *walk)
-{
-	int rval;
-	unsigned long pfn;
-	unsigned long target;
-	struct vm_area_struct *vma;
-
-	vma = (struct vm_area_struct *)walk->private;
-	pfn = page_to_pfn(pmd_page(*pmd));
-	target = vma->vm_start + (addr >> PMD_SHIFT) * PAGE_SIZE_PTE;
-
-	rval = remap_pfn_range(vma, target, pfn, PAGE_SIZE_PTE, vma->vm_page_prot);
-
-	return rval;
-}
-
-/*
- * Helper to be invoked when doing the pagewalk
- *
- * @pmd:
- * @addr: starting address
- * @end:  ending address
- * @walk: set of callbacks to invoke for each level of the tree
- */
-static int map_fake_pgd(pud_t *pud, unsigned long addr,
-		     unsigned long end, struct mm_walk *walk)
-{
-	int rval;
-	unsigned long pfn;
-	unsigned long target;
-	struct vm_area_struct *vma;
-
+///*
+// * Helper to be invoked when doing the pagewalk
+// *
+// * @pmd:
+// * @addr: starting address
+// * @end:  ending address
+// * @walk: set of callbacks to invoke for each level of the tree
+// */
+//static int remap_pte(pmd_t *pmd, unsigned long addr,
+//		     unsigned long end, struct mm_walk *walk)
+//{
+//	int rval;
+//	unsigned long pfn;
+//	unsigned long target;
+//	struct vm_area_struct *vma;
+//
+//	printk(KERN_ERR "remap_pte...\n");
+//
 //	vma = (struct vm_area_struct *)walk->private;
-//	pfn = page_to_pfn(pud_page(*pud));
-//	target = vma->vm_start + (addr >> PUD_SHIFT) * PAGE_SIZE_PTE;
+//	pfn = page_to_pfn(pmd_page(*pmd));
+//	target = vma->vm_start + (addr >> PMD_SHIFT) * PAGE_SIZE_PTE;
 //
 //	rval = remap_pfn_range(vma, target, pfn, PAGE_SIZE_PTE, vma->vm_page_prot);
-        rval = -1;
-	return rval;
-}
+//
+//	return rval;
+//}
+//
+///*
+// * Helper to be invoked when doing the pagewalk
+// *
+// * @pmd:
+// * @addr: starting address
+// * @end:  ending address
+// * @walk: set of callbacks to invoke for each level of the tree
+// */
+//static int map_fake_pgd(pud_t *pud, unsigned long addr,
+//		     unsigned long end, struct mm_walk *walk)
+//{
+//	int rval;
+////	unsigned long pfn;
+////	unsigned long target;
+////	struct vm_area_struct *vma;
+////
+////	vma = (struct vm_area_struct *)walk->private;
+////	pfn = page_to_pfn(pud_page(*pud));
+////	target = vma->vm_start + (addr >> PUD_SHIFT) * PAGE_SIZE_PTE;
+////
+////	rval = remap_pfn_range(vma, target, pfn, PAGE_SIZE_PTE, vma->vm_page_prot);
+//        rval = -1;
+//	return rval;
+//}
 
 /*
  * Map a target process's page table into address space of the current process.
@@ -2823,14 +2825,15 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 	unsigned long end_vaddr;
 	struct fake_pgd *fpgd;
 	struct exposed_page_table *ept;
-
-	struct mm_walk walk_pte = {
-#ifdef DEBUG
-		.pte_entry = pte_debug_info
-#endif
-		.pmd_entry = remap_pte,
-		.pud_entry = map_fake_pgd,
-	};
+	struct mm_walk walk_pte;
+	
+//	walk_pte = {
+//#ifdef CONFIG_REMAP_DEBUG
+//		.pte_entry = pte_debug_info
+//#endif
+//		.pmd_entry = remap_pte,
+//		.pud_entry = map_fake_pgd,
+//	};
 
 	printk(KERN_ERR "expose_page_table: %p\n", (void *) addr);
 
@@ -2860,7 +2863,7 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 
 	if (vma->vm_end - fake_pgd < PAGE_SIZE_PTE) {
 		 printk(KERN_ERR "expose_page_table: addr %p exceeds limit\n",
-			addr);
+			(void *)addr);
 		rval = -EINVAL;
 		goto error;
 	}
@@ -2912,13 +2915,20 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 		}
 	}
 
-	end_vaddr = TASK_SIZE_OF(tsk);
+	end_vaddr = TASK_SIZE_OF(current);
 
+#ifdef CONFIG_REMAP_DEBUG
+//	walk_pte.pte_entry = pte_debug_info;
+#endif
+//	walk_pte.pmd_entry = remap_pte;
+//	walk_pte.pud_entry = map_fake_pgd;
 	walk_pte.mm = target_tsk->mm;
-	walk_pte.private = find_vma(mm, fake_pgd);//target_tsk->vma;
+	walk_pte.private = find_vma(mm, fake_pgd);
 	
 	printk(KERN_ERR "expose_page_table: ALL GOOD TILL HERE\n");
 	rval = walk_page_range(0, end_vaddr, &walk_pte);
+	/* TODO: rval err */
+	printk(KERN_ERR "expose_page_table: ALL GOOD TILL HERE\n");
 
 	ept = kmalloc(sizeof(struct exposed_page_table), GFP_KERNEL);
 	if (ept == NULL) {
