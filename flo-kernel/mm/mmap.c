@@ -2734,17 +2734,20 @@ void __init mmap_init(void)
 
 #define PAGE_SIZE_PTE 4096
 
-#ifdef CONFIG_REMAP_DEBUG
+//#ifdef CONFIG_REMAP_DEBUG
 static int pte_debug_info(pte_t *pte, unsigned long addr, unsigned long end,
 			  struct mm_walk *walk)
 {
 	if (!pte)
-		return 0;
+		return -1;
 
-	printk(KERN_ERR "%p %p %d\n", pte >> PAGE_SHIFT, addr, (pte & L_PTE_DIRTY) > 0);
+	printk(KERN_ERR "0x%lx 0x%lx %d %d %d %d %d\n",
+		addr, pte_pfn(*pte), pte_young(*pte) > 0,
+		pte_file(*pte) > 0, pte_dirty(*pte) > 0,
+		!pte_write(*pte), (pte_val(*pte) & L_PTE_USER) > 0);
 	return 0;
 }
-#endif
+//#endif
 
 ///*
 // * Helper to be invoked when doing the pagewalk
@@ -2754,25 +2757,32 @@ static int pte_debug_info(pte_t *pte, unsigned long addr, unsigned long end,
 // * @end:  ending address
 // * @walk: set of callbacks to invoke for each level of the tree
 // */
-//static int remap_pte(pmd_t *pmd, unsigned long addr,
-//		     unsigned long end, struct mm_walk *walk)
-//{
-//	int rval;
-//	unsigned long pfn;
-//	unsigned long target;
-//	struct vm_area_struct *vma;
-//
-//	printk(KERN_ERR "remap_pte...\n");
-//
-//	vma = (struct vm_area_struct *)walk->private;
-//	pfn = page_to_pfn(pmd_page(*pmd));
-//	target = vma->vm_start + (addr >> PMD_SHIFT) * PAGE_SIZE_PTE;
-//
-//	rval = remap_pfn_range(vma, target, pfn, PAGE_SIZE_PTE, vma->vm_page_prot);
-//
-//	return rval;
+static int remap_pte(pmd_t *pmd, unsigned long addr,
+		     unsigned long end, struct mm_walk *walk)
+{
+//	printk(KERN_ERR "pmd: %p\n",pmd);
+//	return 0;
 //}
-//
+	int rval;
+	unsigned long pfn;
+	unsigned long target;
+	struct vm_area_struct *vma;
+
+
+	vma = (struct vm_area_struct *)walk->private;
+	pfn = page_to_pfn(pmd_page(*pmd));
+	if (!pmd_none(*pmd)) {
+		target = vma->vm_start + (addr >> PMD_SHIFT) * PAGE_SIZE_PTE;
+		rval = remap_pfn_range(vma, target, pfn, PAGE_SIZE_PTE,
+				       vma->vm_page_prot);
+		printk(KERN_ERR "remap_pte...\n");
+	} else {
+		printk(KERN_ERR "cannot remap_pte...\n");
+		rval = -1;
+	}
+	return rval;
+}
+
 ///*
 // * Helper to be invoked when doing the pagewalk
 // *
@@ -2781,9 +2791,17 @@ static int pte_debug_info(pte_t *pte, unsigned long addr, unsigned long end,
 // * @end:  ending address
 // * @walk: set of callbacks to invoke for each level of the tree
 // */
-//static int map_fake_pgd(pud_t *pud, unsigned long addr,
-//		     unsigned long end, struct mm_walk *walk)
-//{
+static int map_fake_pgd(pud_t *pud, unsigned long addr,
+		     unsigned long end, struct mm_walk *walk)
+{
+	printk(KERN_ERR "pud:%p\n", pud);
+	return 0;
+}
+static int pgd_entr(pgd_t *pgd, unsigned long addr,
+			unsigned long end, struct mm_walk *walk){
+	printk(KERN_ERR "pgd:%p\n", pgd);
+	return 0;
+}
 //	int rval;
 ////	unsigned long pfn;
 ////	unsigned long target;
@@ -2821,11 +2839,10 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 	struct inode *inode;
 	struct task_struct *target_tsk;
 	struct mm_struct *mm;
-	struct vm_area_struct *vma;
+	struct vm_area_struct *vma, *target_vma;
 	unsigned long end_vaddr;
 	struct fake_pgd *fpgd;
 	struct exposed_page_table *ept;
-	struct mm_walk walk_pte;
 	
 //	walk_pte = {
 //#ifdef CONFIG_REMAP_DEBUG
@@ -2851,7 +2868,7 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 	}
 
 	mm = current->mm;
-
+	 printk(KERN_ERR "pid: %ld\n", (long) pid);
 	/* find the first vma after addr */
 	down_write(&mm->mmap_sem);
 	vma = find_vma(mm, fake_pgd);
@@ -2917,18 +2934,27 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 
 	end_vaddr = TASK_SIZE_OF(current);
 
-#ifdef CONFIG_REMAP_DEBUG
-//	walk_pte.pte_entry = pte_debug_info;
-#endif
-//	walk_pte.pmd_entry = remap_pte;
-//	walk_pte.pud_entry = map_fake_pgd;
-	walk_pte.mm = target_tsk->mm;
-	walk_pte.private = find_vma(mm, fake_pgd);
+	struct mm_walk walk_pte = {
+//#ifdef CONFIG_REMAP_DEBUG
+	.pte_entry = pte_debug_info,
+//#endif
+	.pmd_entry = remap_pte,
+	.pud_entry = map_fake_pgd,
+	.pgd_entry = pgd_entr,
+	.mm = target_tsk->mm,
+	.private = find_vma(mm, fake_pgd),
+	};
+	//target_vma = find_vma(target_tsk->mm, target_tsk->mm->mmap->vm_start);
 	
 	printk(KERN_ERR "expose_page_table: ALL GOOD TILL HERE\n");
-	rval = walk_page_range(0, end_vaddr, &walk_pte);
+	for (target_vma = target_tsk->mm->mmap ; target_vma != NULL; target_vma = target_vma->vm_next) {
+		 if (is_vm_hugetlb_page(target_vma))
+			 continue;
+		printk(KERN_ERR "----%p----%p----%p\n", target_vma, (void *)target_vma->vm_start, (void *)target_vma->vm_end);
+		rval = walk_page_range(target_vma->vm_start, target_vma->vm_end, &walk_pte);
+	}
 	/* TODO: rval err */
-	printk(KERN_ERR "expose_page_table: ALL GOOD TILL HERE\n");
+	printk(KERN_ERR "after expose_page_table: ALL GOOD TILL HERE\n");
 
 	ept = kmalloc(sizeof(struct exposed_page_table), GFP_KERNEL);
 	if (ept == NULL) {
