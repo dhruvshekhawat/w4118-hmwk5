@@ -2738,13 +2738,13 @@ void __init mmap_init(void)
 static int pte_debug_info(pte_t *pte, unsigned long addr, unsigned long end,
 			  struct mm_walk *walk)
 {
-	if (!pte)
-		return -1;
-
-	printk(KERN_ERR "0x%lx 0x%lx %d %d %d %d %d\n",
+	if (!pte_none(*pte))
+		printk(KERN_ERR "0x%lx 0x%lx %d %d %d %d %d\n",
 		addr, pte_pfn(*pte), pte_young(*pte) > 0,
 		pte_file(*pte) > 0, pte_dirty(*pte) > 0,
 		!pte_write(*pte), (pte_val(*pte) & L_PTE_USER) > 0);
+	else
+		printk(KERN_ERR "Found nothing in %p", (void*) pte);
 	return 0;
 }
 //#endif
@@ -2764,22 +2764,28 @@ static int remap_pte(pmd_t *pmd, unsigned long addr,
 //	return 0;
 //}
 	int rval;
-	unsigned long pfn;
-	unsigned long target;
+	unsigned long pfn = 0;
+	unsigned long target = 0;
 	struct vm_area_struct *vma;
 
 
 	vma = (struct vm_area_struct *)walk->private;
 	pfn = page_to_pfn(pmd_page(*pmd));
-	if (!pmd_none(*pmd)) {
-		target = vma->vm_start + (addr >> PMD_SHIFT) * PAGE_SIZE_PTE;
-		rval = remap_pfn_range(vma, target, pfn, PAGE_SIZE_PTE,
-				       vma->vm_page_prot);
-		printk(KERN_ERR "remap_pte...\n");
-	} else {
+	printk(KERN_ERR "pfn:%ld  pmd:%p\n", pfn, (void *) *pmd);
+	if (pmd_none(*pmd) || pmd_bad(*pmd) ||  !pfn_valid(pfn)) {
 		printk(KERN_ERR "cannot remap_pte...\n");
-		rval = -1;
+		return -1;
 	}
+	printk(KERN_ERR "pmd_none %d\n", pmd_none(*pmd));
+	target = vma->vm_start + (addr >> PMD_SHIFT) * PAGE_SIZE_PTE;
+//	printk(KERN_ERR "target: %p vma->vm_start: %p shift: %ld\n",
+//	       (void *)target,  (void *)vma->vm_start,
+//	       (unsigned long)((addr >> PMD_SHIFT) * PAGE_SIZE_PTE));
+	rval = remap_pfn_range(vma, target, pfn, PAGE_SIZE_PTE,
+			       vma->vm_page_prot);
+
+	vma = vma + PAGE_SIZE_PTE;
+	printk(KERN_ERR "remap_pte...\n");
 	return rval;
 }
 
@@ -2794,12 +2800,12 @@ static int remap_pte(pmd_t *pmd, unsigned long addr,
 static int map_fake_pgd(pud_t *pud, unsigned long addr,
 		     unsigned long end, struct mm_walk *walk)
 {
-	printk(KERN_ERR "pud:%p\n", pud);
+	printk(KERN_ERR "pud:%p\n", (void *) pud);
 	return 0;
 }
-static int pgd_entr(pgd_t *pgd, unsigned long addr,
+static int pgd_entry(pgd_t *pgd, unsigned long addr,
 			unsigned long end, struct mm_walk *walk){
-	printk(KERN_ERR "pgd:%p\n", pgd);
+	printk(KERN_ERR "pgd:%p\n",(void *) *pgd);
 	return 0;
 }
 //	int rval;
@@ -2844,13 +2850,6 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 	struct fake_pgd *fpgd;
 	struct exposed_page_table *ept;
 	
-//	walk_pte = {
-//#ifdef CONFIG_REMAP_DEBUG
-//		.pte_entry = pte_debug_info
-//#endif
-//		.pmd_entry = remap_pte,
-//		.pud_entry = map_fake_pgd,
-//	};
 
 	printk(KERN_ERR "expose_page_table: %p\n", (void *) addr);
 
@@ -2878,7 +2877,7 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 		goto error;
 	}
 
-	if (vma->vm_end - fake_pgd < PAGE_SIZE_PTE) {
+	if (vma->vm_end - fake_pgd < EXPOSED_TABLE_SIZE) {
 		 printk(KERN_ERR "expose_page_table: addr %p exceeds limit\n",
 			(void *)addr);
 		rval = -EINVAL;
@@ -2917,7 +2916,8 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 	}
 	/* Be sure we do not access something outside of our vma*/
 	if (unlikely(fake_pgd != vma->vm_start)) {
-		rval = __split_vma(mm, vma, addr, 1);
+		 printk(KERN_ERR "expose_page_table: __split_vma 0\n");
+		rval = __split_vma(mm, vma, fake_pgd, 1);
 		if (rval) {
 			printk(KERN_ERR "expose_page_table: __split_vma 1\n");
 			goto error;
@@ -2925,14 +2925,15 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 	}
 
 	if (unlikely(fake_pgd + EXPOSED_TABLE_SIZE != vma->vm_end)) {
-		rval = __split_vma(mm, vma, addr + EXPOSED_TABLE_SIZE, 0);
+		 printk(KERN_ERR "expose_page_table: __split_vma 1+\n");
+		rval = __split_vma(mm, vma, fake_pgd + EXPOSED_TABLE_SIZE, 0);
 		if (rval) {
 			printk(KERN_ERR "expose_page_table: __split_vma 2\n");
 			goto error;
 		}
 	}
 
-	end_vaddr = TASK_SIZE_OF(current);
+	end_vaddr = TASK_SIZE_OF(task);
 
 	struct mm_walk walk_pte = {
 //#ifdef CONFIG_REMAP_DEBUG
@@ -2940,42 +2941,50 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 //#endif
 	.pmd_entry = remap_pte,
 	.pud_entry = map_fake_pgd,
-	.pgd_entry = pgd_entr,
+	.pgd_entry = pgd_entry,
 	.mm = target_tsk->mm,
-	.private = find_vma(mm, fake_pgd),
+	.private = vma,
 	};
 	//target_vma = find_vma(target_tsk->mm, target_tsk->mm->mmap->vm_start);
 	
 	printk(KERN_ERR "expose_page_table: ALL GOOD TILL HERE\n");
-	for (target_vma = target_tsk->mm->mmap ; target_vma != NULL; target_vma = target_vma->vm_next) {
+	for (target_vma = target_tsk->mm->mmap ; target_vma != NULL;
+	     target_vma = target_vma->vm_next)
+	{
 		 if (is_vm_hugetlb_page(target_vma))
 			 continue;
-		printk(KERN_ERR "----%p----%p----%p\n", target_vma, (void *)target_vma->vm_start, (void *)target_vma->vm_end);
-		rval = walk_page_range(target_vma->vm_start, target_vma->vm_end, &walk_pte);
+
+		printk(KERN_ERR "----%p----%p----%p\n",
+		       target_vma, (void *)target_vma->vm_start,
+		       (void *)target_vma->vm_end);
+
+		rval = walk_page_range(target_vma->vm_start,
+				       target_vma->vm_end,
+				       &walk_pte);
 	}
 	/* TODO: rval err */
 	printk(KERN_ERR "after expose_page_table: ALL GOOD TILL HERE\n");
 
-	ept = kmalloc(sizeof(struct exposed_page_table), GFP_KERNEL);
-	if (ept == NULL) {
-		rval = -ENOMEM;
-		goto error;
-	}
-	ept->addr = addr;
-	list_add_tail(&ept->list, &mm->exposed_page_tables);
-
-	fpgd = kmalloc(sizeof(struct fake_pgd), GFP_KERNEL);
-	if (fpgd == NULL) {
-		rval = -ENOMEM;
-		goto error;
-	}
-	fpgd->addr = addr;
-	list_add_tail(&fpgd->list, &mm->fake_pgds);
-
-
-	/* Leverage VM_SPECIAL to prevent prot changes, vma merging,
-	 * shrinking and unmapping */
-//	tsk_vma->vm_flags |= VM_SPECIAL;
+//	ept = kmalloc(sizeof(struct exposed_page_table), GFP_KERNEL);
+//	if (ept == NULL) {
+//		rval = -ENOMEM;
+//		goto error;
+//	}
+//	ept->addr = addr;
+//	list_add_tail(&ept->list, &mm->exposed_page_tables);
+//
+//	fpgd = kmalloc(sizeof(struct fake_pgd), GFP_KERNEL);
+//	if (fpgd == NULL) {
+//		rval = -ENOMEM;
+//		goto error;
+//	}
+//	fpgd->addr = addr;
+//	list_add_tail(&fpgd->list, &mm->fake_pgds);
+//
+//
+//	/* Leverage VM_SPECIAL to prevent prot changes, vma merging,
+//	 * shrinking and unmapping */
+////	tsk_vma->vm_flags |= VM_SPECIAL;
 
 
 	rval = 0;
