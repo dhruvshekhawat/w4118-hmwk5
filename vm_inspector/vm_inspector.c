@@ -9,6 +9,28 @@
 #include <sys/mman.h>
 #include <sys/types.h>
 
+#define PGD_ENTRIES 			2048
+#define PTE_ENTRIES 			512
+#define PAGE_SIZE			4096
+#define PAGE_SHIFT			12
+#define EXPOSED_PAGE_TABLE_SIZE 	(2 * PGD_ENTRIES * PTE_ENTRIES)
+
+#define base_address(page) 		(page * PAGE_SIZE)
+#define pfn_of_pte(pte) 		(pte >> PAGE_SHIFT) 
+#define filebit(vma)			((vma & (1 << 2)) > 0)
+#define dirtybit(vma)			((vma & (1 << 6)) > 0)
+#define readonlybit(vma)		((vma & (1 << 7)) > 0)
+#define xnbit(vma)			0
+#define pte_none(pte)			(!pte)
+
+#define page_offset(offset) 		(offset % 512)
+#define pte_base(ind) 			((ind / 512 * PAGE_SIZE) / 4)
+
+#define expose_page_table(a, b, c) 	syscall(378, a, b, c)
+
+/*
+ * Helpers for argument parsing
+ */
 static int is_numeric(const char *s)
 {
 	char *p;
@@ -25,38 +47,25 @@ static inline int is_verbose(char *arg)
 	return strlen(arg) == 2 && strncmp(arg, "-v", 2) == 0;
 }
 
-#define PAGE_SIZE			(4*1024)
-#define PGD_TABLE_SIZE			(1024*PAGE_SIZE)
-#define PAGE_SHIFT			12
-#define expose_page_table(a, b, c)	syscall(378, a, b, c)
-/* TODO IMPLEMENT BELOW */
-#define virt(vma)			(vma*PAGE_SIZE)
-#define phys(vma)			(vma >> PAGE_SHIFT)
-#define filebit(vma)			((vma & (1 << 2)) > 0)
-#define dirtybit(vma)			((vma & (1 << 6)) > 0)
-#define readonlybit(vma)		((vma & (1 << 7)) > 0)
-#define xnbit(vma)			0
+
 
 int main(int argc, char **argv)
 {
-//	int i;//, x;
+	int i;
 	int fd;
-	int ret;
-	int pid = -1;
+	int rval;
+	int pid;
 	int verbose;
-//	unsigned long vma;
-//	unsigned long *addr;
 	unsigned long fake_pgd;
-//	unsigned long accessed;
 
 
 	if (argc != 2 && argc != 3) {
-		printf("Usage:%s [-v] [pid]\n", argv[0]);
+		printf("Usage:%s [-v] pid\n", argv[0]);
 		return -1;
 	}
 
+	pid = -1;
 	verbose = 0;
-
 	if (argc == 2) { 
 		/*
 		 * If given one argument, check whether it is "-v" or
@@ -87,7 +96,7 @@ int main(int argc, char **argv)
 	}
 
 	/*
-	 * TODO: Remove this and ise MAP_PRIVATE...
+	 * TODO: Remove this and use MAP_PRIVATE
 	 */
 	fd = open("/dev/zero", O_RDONLY);
 	if (fd == -1) {
@@ -95,7 +104,8 @@ int main(int argc, char **argv)
 		perror("open");
 		return -1;
 	}
-	fake_pgd = (unsigned long) mmap(NULL, 2 * 4 * 1024 * 1024, PROT_READ, MAP_SHARED, fd, 0);
+
+	fake_pgd = (unsigned long) mmap(NULL, 3 * 4 * 1024 * 1024, PROT_READ, MAP_SHARED, fd, 0);
 
 	if (fake_pgd == (unsigned long) NULL) {
 		perror("mmap");
@@ -105,35 +115,30 @@ int main(int argc, char **argv)
 	close(fd);
 
 
-	//for (i = 0; i < PGD_TABLE_SIZE / sizeof(unsigned long); i++) {
-	//	accessed = (unsigned long)((unsigned long *) fake_pgd + i);
-	//}
-	//(void) accessed;
-
-	printf("fake_pgd:%p\n", (void *)fake_pgd);
-	printf("addr:%p\n", (void *) (fake_pgd + PGD_TABLE_SIZE));
-
-	ret = 0;
-	printf("%ld %d %p\n", (long)pid, ret, (void *) (fake_pgd + PGD_TABLE_SIZE));
-	
-	ret = expose_page_table(pid, fake_pgd, fake_pgd);
-	if (ret != 0) {
+	rval = expose_page_table(pid, fake_pgd, fake_pgd);
+	if (rval != 0) {
 		perror("syscall: ");
-		return ret;
+		return rval;
 	}
-	(void) verbose;
-//	addr = (unsigned long *)(fake_pgd);
-//	for (i = 0; i < PGD_TABLE_SIZE/sizeof(int); i++) {
-//		x = (((i / 512 * PAGE_SIZE) / 4) + (i % 512));
-//		vma = addr[x*4*1024]; /* TODO not sure if this is correct */
-//		if (vma == 0)
-//			printf("%d %p %p %d %d %d %d\n",
-//				x, (void *)virt(vma), (void *)phys(vma),
-//				filebit(vma), dirtybit(vma),
-//				readonlybit(vma), xnbit(vma));
-//		else if (verbose)
-//			printf("%d %p 0 0 0 0 0 0", i, (void *)virt(vma));
-//	}
-//	munmap((void *)fake_pgd, 2 * 4 * 1024 * 1024);
+
+	for (i = 0; i < EXPOSED_PAGE_TABLE_SIZE / sizeof(int); ++i) {
+
+		unsigned int pte;
+
+		if ( ((unsigned long *)fake_pgd)[pte_base(i) + page_offset(i)] != 0) {
+			pte = ((unsigned long *)fake_pgd)[pte_base(i) + page_offset(i)];
+			printf("%d 0x%x 0x%x %d %d %d \n",
+			       i, base_address(i), 
+			       pfn_of_pte(pte), filebit(pte),
+			       dirtybit(pte), readonlybit(pte));
+			continue;
+		}
+		if (verbose)
+			printf("0 0x0 0x0 0 0 0 \n");
+
+	}
+
+	munmap((void *)fake_pgd, 3 * 4 * 1024 * 1024);
+	
 	return 0;
 }
