@@ -2085,12 +2085,6 @@ int do_munmap(struct mm_struct *mm, unsigned long start, size_t len)
 	if (vma->vm_start >= end)
 		return 0;
 
-//	tmp = vma;
-//	while (tmp && tmp->vm_start < end) {
-//		if ((tmp->vm_flags & VM_SPECIAL) == VM_SPECIAL)
-//			return -EINVAL;
-//		tmp = tmp->vm_next;
-//	}
 	/*
 	 * If we need to split any vma, do it now to save pain later.
 	 *
@@ -2744,31 +2738,29 @@ void __init mmap_init(void)
 static int pte_debug_info(pte_t *pte, unsigned long addr, unsigned long end,
 			  struct mm_walk *walk)
 {
-	if (!pte_none(*pte))
-		printk(KERN_ERR "0x%lx 0x%lx %d %d %d %d %d\n",
-		addr, pte_pfn(*pte), pte_young(*pte) > 0,
-		pte_file(*pte) > 0, pte_dirty(*pte) > 0,
-		!pte_write(*pte), (pte_val(*pte) & L_PTE_USER) > 0);
+//	if (!pte_none(*pte))
+//		printk(KERN_ERR "0x%lx 0x%lx %d %d %d %d %d\n",
+//		addr, pte_pfn(*pte), pte_young(*pte) > 0,
+//		pte_file(*pte) > 0, pte_dirty(*pte) > 0,
+//		!pte_write(*pte), (pte_val(*pte) & L_PTE_USER) > 0);
 //	else
 //		printk(KERN_ERR "Found nothing in %p", (void*) pte);
 	return 0;
 }
 //#endif
 
-///*
-// * Helper to be invoked when doing the pagewalk
-// *
-// * @pmd:
-// * @addr: starting address
-// * @end:  ending address
-// * @walk: set of callbacks to invoke for each level of the tree
-// */
+/*
+ * Helper to be invoked when doing the pagewalk
+ *
+ * @pmd:
+ * @addr: starting address
+ * @end:  ending address
+ * @walk: set of callbacks to invoke for each level of the tree
+ */
 static int remap_pte(pmd_t *pmd, unsigned long addr,
 		     unsigned long end, struct mm_walk *walk)
 {
-//	printk(KERN_ERR "pmd: %p\n",pmd);
-//	return 0;
-//}
+
 	int rval;
 	unsigned long pfn = 0;
 	static unsigned long target;
@@ -2779,53 +2771,37 @@ static int remap_pte(pmd_t *pmd, unsigned long addr,
 		unsigned long current_addr;
 	};
 
-
-	printk(KERN_ERR "remap_pte.1..\n");
-
 	vma = ((struct metadata *) walk->private)->caller_vma;
 
-	if ( vma == NULL)
+	if (vma == NULL)
 		return -1;
 	target = ((struct metadata *) walk->private)->current_addr;
 	pfn = page_to_pfn(pmd_page(*pmd));
-	printk(KERN_ERR "pfn:%ld  pmd:%p\n", pfn, (void *) *pmd);
-	if (pmd_none(*pmd) || pmd_bad(*pmd) ||  !pfn_valid(pfn)) {
-		printk(KERN_ERR "cannot remap_pte...\n");
+	if (pmd_none(*pmd) || pmd_bad(*pmd) ||  !pfn_valid(pfn))
 		return -1;
-	}
-	printk(KERN_ERR "pmd_none %d\n", pmd_none(*pmd));
 	target = target + (addr >> PMD_SHIFT) * PAGE_SIZE_PTE;
-	printk(KERN_ERR "target %p PAGE_SIZE_PTE %d PMD_SHIFT: %d\n", 
-	       (void *)target, PAGE_SIZE_PTE, PMD_SHIFT);
 	
-//	printk(KERN_ERR "target: %p vma->vm_start: %p shift: %ld\n",
-//	       (void *)target,  (void *)vma->vm_start,
-//	       (unsigned long)((addr >> PMD_SHIFT) * PAGE_SIZE_PTE));
 	rval = remap_pfn_range(vma, target, pfn, PAGE_SIZE_PTE,
 			       vma->vm_page_prot);
 	((struct metadata *)walk->private)->current_addr += PAGE_SIZE_PTE;
-	//vma = vma + PAGE_SIZE_PTE;
-	printk(KERN_ERR "remap_pte..2.\n");
 	return rval;
 }
 
-///*
-// * Helper to be invoked when doing the pagewalk
-// *
-// * @pmd:
-// * @addr: starting address
-// * @end:  ending address
-// * @walk: set of callbacks to invoke for each level of the tree
-// */
+/*
+ * Helper to be invoked when doing the pagewalk
+ *
+ * @pmd:
+ * @addr: starting address
+ * @end:  ending address
+ * @walk: set of callbacks to invoke for each level of the tree
+ */
 static int map_fake_pgd(pud_t *pud, unsigned long addr,
 		     unsigned long end, struct mm_walk *walk)
 {
-	printk(KERN_ERR "pud:%p\n", (void *) pud);
 	return 0;
 }
 static int pgd_entry(pgd_t *pgd, unsigned long addr,
 			unsigned long end, struct mm_walk *walk){
-	printk(KERN_ERR "pgd:%p\n",(void *) *pgd);
 	return 0;
 }
 //	int rval;
@@ -2874,8 +2850,6 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 	struct mm_walk walk_pte = {};
 	
 
-	printk(KERN_ERR "expose_page_table: %p\n", (void *) addr);
-
 	if (addr & ~PAGE_MASK || fake_pgd & ~PAGE_MASK) {
 		printk(KERN_ERR "expose_page_table: "
 		       "addr or fake_pgd not page alligned...\n");
@@ -2883,18 +2857,14 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 	}
 
 	target_tsk = pid == -1 ? current : find_task_by_vpid(pid);
-	if (target_tsk == NULL){
-		printk(KERN_ERR "expose_page_table: Cannot find task with"
-		       "pid: %ld\n", (long) pid);
+	if (target_tsk == NULL)
 		return -EINVAL;
-	}
 
 	mm = current->mm;
-	printk(KERN_ERR "pid: %ld\n", (long) pid);
 	/* find the first vma after addr */
 	down_write(&mm->mmap_sem);
-//	if (pid != -1)
-//		down_write(&target_tsk->mm->mmap_sem);
+/*	if (pid != -1)
+		down_write(&target_tsk->vm_mm->mmap_sem);*/
 	vma = find_vma(mm, fake_pgd);
 	if (vma == NULL) {
 		printk(KERN_ERR "expose_page_table: Cannot find VMA\n");
@@ -2951,16 +2921,15 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 	walk_pte.pte_entry = pte_debug_info;
 //#endif
 	walk_pte.pmd_entry = remap_pte;
-//	walk_pte.pud_entry = map_fake_pgd,
 //	walk_pte.pgd_entry = pgd_entry,
 	walk_pte.mm = target_tsk->mm;
 	
-	struct metadata {
+	struct walk_metadata {
 		struct vm_area_struct *caller_vma;
 		unsigned long current_addr;
 	};
 
-	struct metadata m;
+	struct walk_metadata m;
 
 	m.caller_vma = vma;
 	m.current_addr = vma->vm_start;
@@ -2969,56 +2938,23 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 
 	target_vma = find_vma(target_tsk->mm, target_tsk->mm->mmap->vm_start);
 	
-	printk(KERN_ERR "expose_page_table: ALL GOOD TILL HERE\n");
-	for (target_vma = target_tsk->mm->mmap ; ;
+	for (target_vma = target_tsk->mm->mmap ; target_vma->vm_next != NULL;
 	     target_vma = target_vma->vm_next)
 	{
-	//	 if (is_vm_hugetlb_page(target_vma))
-	//		 continue;
-		
-//		printk(KERN_ERR "----%p----%p----%p\n",
-//		       target_vma, (void *)target_vma->vm_start,
-//		       (void *)target_vma->vm_end);
-
 		rval = walk_page_range(target_vma->vm_start,
 				       target_vma->vm_end,
 				       &walk_pte);
-		printk(KERN_ERR "rval: %d\n", rval);
 		if (rval)
 			goto error;
-		if ( target_vma->vm_next == NULL )
-			break;
 	}
 	
 	/* TODO: rval err */
 	target_vma->vm_flags |= VM_SPECIAL;
-	printk(KERN_ERR "after expose_page_table: ALL GOOD TILL HERE\n");
-
-//	ept = kmalloc(sizeof(struct exposed_page_table), GFP_KERNEL);
-//	if (ept == NULL) {
-//		rval = -ENOMEM;
-//		goto error;
-//	}
-//	ept->addr = addr;
-//	list_add_tail(&ept->list, &mm->exposed_page_tables);
-//
-//	fpgd = kmalloc(sizeof(struct fake_pgd), GFP_KERNEL);
-//	if (fpgd == NULL) {
-//		rval = -ENOMEM;
-//		goto error;
-//	}
-//	fpgd->addr = addr;
-//	list_add_tail(&fpgd->list, &mm->fake_pgds);
-//
-//
-//	/* Leverage VM_SPECIAL to prevent prot changes, vma merging,
-//	 * shrinking and unmapping */
-
 
 	rval = 0;
 error:
-//	if (pid == -1)
-//		up_write(&target_vma->mm->mmap_sem);
+/*	if (pid == -1)
+		up_write(&target_vma->vm_mm->mmap_sem);*/
 	up_write(&mm->mmap_sem);
 	return rval;
 }
