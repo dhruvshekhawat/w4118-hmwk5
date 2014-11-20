@@ -2319,9 +2319,6 @@ int remap_pfn_range(struct vm_area_struct *vma, unsigned long addr,
 		next = pgd_addr_end(addr, end);
 		err = remap_pud_range(mm, pgd, addr, next,
 				pfn + (addr >> PAGE_SHIFT), prot);
-//		printk(KERN_ERR "pgd: %p pfn: %p addr: %p end: %p next: %p\n",
-//		       (void *) pgd, (void *) pfn, (void *) addr,
-//		       (void *) end, (void *) next);
 		if (err)
 			break;
 	} while (pgd++, addr = next, addr != end);
