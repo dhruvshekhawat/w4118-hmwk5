@@ -11,10 +11,10 @@
  * in which fake pdg indexes remmaped pte.
  *
  *   fake pdg          remapped pte
- * |     0     |----> +------------+ Remapped Address of Page Table 0  
- * +-----------+      |            | 
+ * |     0     |----> +------------+ Remapped Address of Page Table 0
+ * +-----------+      |            |
  * |     1     |---   |            |
- * +-----------+  |   +------------+ 
+ * +-----------+  |   +------------+
  * |     2     |  |   |     '      |
  * +-----------+  |   |     '      |
  * |     3     |  |   |     '      |
@@ -32,6 +32,19 @@
  *
  */
 #define EXPOSED_TABLE_SIZE			(8 * 1024 * 1024)
+
+/*
+ * Use this struct to keep metadate while pagewalk invokes our
+ * callback.
+ *
+ * @caller_vma: The caller's vma dedicated to expore the remaping
+ * @addr: The current address when expose_pfn_range is exposeing 
+ * 	  remapped ptes.
+ */
+struct walk_metadata {
+	struct vm_area_struct *caller_vma;
+	unsigned long addr;
+};
 
 
 

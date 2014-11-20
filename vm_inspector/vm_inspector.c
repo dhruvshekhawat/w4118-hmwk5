@@ -9,24 +9,24 @@
 #include <sys/mman.h>
 #include <sys/types.h>
 
-#define PGD_ENTRIES 			2048
-#define PTE_ENTRIES 			512
+#define TWEAKED_PGD_ENTRIES		2048
+#define TWEAKED_PTE_ENTRIES		512
+#define EXPOSED_TBL_ENTRIES		(2048 * 512)
 #define PAGE_SIZE			4096
 #define PAGE_SHIFT			12
-#define EXPOSED_PAGE_TABLE_SIZE 	(2 * PGD_ENTRIES * PTE_ENTRIES)
 
-#define base_address(page) 		(page * PAGE_SIZE)
-#define pfn_of_pte(pte) 		(pte >> PAGE_SHIFT) 
+#define base_address(page)		(page * PAGE_SIZE)
+#define pfn_of_pte(pte)			(pte >> PAGE_SHIFT)
 #define filebit(vma)			((vma & (1 << 2)) > 0)
 #define dirtybit(vma)			((vma & (1 << 6)) > 0)
 #define readonlybit(vma)		((vma & (1 << 7)) > 0)
 #define xnbit(vma)			0
 #define pte_none(pte)			(!pte)
 
-#define page_offset(offset) 		(offset % 512)
-#define pte_base(ind) 			((ind / 512 * PAGE_SIZE) / 4)
+#define pte_offset(index)		(index % 512)
+#define pte_base(index)			(((index / 512) * PAGE_SIZE) / 4)
 
-#define expose_page_table(a, b, c) 	syscall(378, a, b, c)
+#define expose_page_table(a, b, c)	syscall(378, a, b, c)
 
 /*
  * Helpers for argument parsing
@@ -47,8 +47,6 @@ static inline int is_verbose(char *arg)
 	return strlen(arg) == 2 && strncmp(arg, "-v", 2) == 0;
 }
 
-
-
 int main(int argc, char **argv)
 {
 	int i;
@@ -66,18 +64,17 @@ int main(int argc, char **argv)
 
 	pid = -1;
 	verbose = 0;
-	if (argc == 2) { 
+	if (argc == 2) {
 		/*
 		 * If given one argument, check whether it is "-v" or
 		 * a pid? If not, set pid equal to -1 in order to
 		 * tract the current process.
 		 */
-		if (is_verbose(argv[1]))
-			verbose = 1;
-		else if (is_numeric(argv[1]))
-			pid = atoi(argv[1]);
-		else
-			pid = -1;
+		if (!is_numeric(argv[1])) {
+			printf("usage: %s [-v] pid\n", argv[0]);
+			return -1;
+		}
+		pid = atoi(argv[1]);
 	} else if (argc == 3) {
 		/*
 		 * If given twho arguments, try to match vebose
@@ -90,7 +87,7 @@ int main(int argc, char **argv)
 			verbose = 1;
 			pid = atoi(argv[2]);
 		} else {
-			printf("usage: %s [-v] [pid]\n", argv[0]);
+			printf("usage: %s [-v] pid\n", argv[0]);
 			return -1;
 		}
 	}
@@ -105,7 +102,9 @@ int main(int argc, char **argv)
 		return -1;
 	}
 
-	fake_pgd = (unsigned long) mmap(NULL, 3 * 4 * 1024 * 1024, PROT_READ, MAP_SHARED, fd, 0);
+	fake_pgd = (unsigned long) mmap(NULL, 
+					3 * 4 * 1024 * 1024, 
+					PROT_READ, MAP_SHARED, fd, 0);
 
 	if (fake_pgd == (unsigned long) NULL) {
 		perror("mmap");
@@ -114,19 +113,19 @@ int main(int argc, char **argv)
 	}
 	close(fd);
 
-
 	rval = expose_page_table(pid, fake_pgd, fake_pgd);
 	if (rval != 0) {
 		perror("syscall: ");
 		return rval;
 	}
 
-	for (i = 0; i < EXPOSED_PAGE_TABLE_SIZE / sizeof(int); ++i) {
+	for (i = 0; i < EXPOSED_TBL_ENTRIES; ++i) {
 
 		unsigned int pte;
 
-		if ( ((unsigned long *)fake_pgd)[pte_base(i) + page_offset(i)] != 0) {
-			pte = ((unsigned long *)fake_pgd)[pte_base(i) + page_offset(i)];
+		if ( ((unsigned long *)fake_pgd)[pte_base(i) + 
+		     pte_offset(i)] != 0) {
+			pte = ((unsigned long *)fake_pgd)[pte_base(i) + pte_offset(i)];
 			printf("%d 0x%x 0x%x %d %d %d \n",
 			       i, base_address(i), 
 			       pfn_of_pte(pte), filebit(pte),
