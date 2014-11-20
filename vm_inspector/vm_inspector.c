@@ -102,8 +102,8 @@ int main(int argc, char **argv)
 		return -1;
 	}
 
-	fake_pgd = (unsigned long) mmap(NULL, 
-					3 * 4 * 1024 * 1024, 
+	fake_pgd = (unsigned long) mmap(NULL,
+					3 * 4 * 1024 * 1024,
 					PROT_READ, MAP_SHARED, fd, 0);
 
 	if (fake_pgd == (unsigned long) NULL) {
@@ -123,21 +123,22 @@ int main(int argc, char **argv)
 
 		unsigned int pte;
 
-		if ( ((unsigned long *)fake_pgd)[pte_base(i) + 
+		if (((unsigned long *)fake_pgd)[pte_base(i) +
 		     pte_offset(i)] != 0) {
-			pte = ((unsigned long *)fake_pgd)[pte_base(i) + pte_offset(i)];
-			printf("%d 0x%x 0x%x %d %d %d \n",
-			       i, base_address(i), 
+			pte = ((unsigned long *)fake_pgd)[pte_base(i) +
+				pte_offset(i)];
+			printf("%d 0x%x 0x%x %d %d %d\n",
+			       i, base_address(i),
 			       pfn_of_pte(pte), filebit(pte),
 			       dirtybit(pte), readonlybit(pte));
 			continue;
 		}
 		if (verbose)
-			printf("0 0x0 0x0 0 0 0 \n");
+			printf("0 0x0 0x0 0 0 0\n");
 
 	}
 
 	munmap((void *)fake_pgd, 3 * 4 * 1024 * 1024);
-	
+
 	return 0;
 }
