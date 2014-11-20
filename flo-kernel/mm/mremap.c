@@ -461,9 +461,9 @@ unsigned long do_mremap(unsigned long addr,
 	/*
 	 * No remapping on exposed pfns
 	 */
-	vma = find_vma(mm, addr);
-	if (vma && (vma->vm_flags & VM_SPECIAL) == VM_SPECIAL)
-		goto out;
+//	vma = find_vma(mm, addr);
+//	if (vma && (vma->vm_flags & VM_SPECIAL) == VM_SPECIAL)
+//		goto out;
 
 	if (flags & MREMAP_FIXED) {
 		if (flags & MREMAP_MAYMOVE)

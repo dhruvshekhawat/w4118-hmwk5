@@ -267,6 +267,10 @@ SYSCALL_DEFINE3(mprotect, unsigned long, start, size_t, len,
 	error = -ENOMEM;
 	if (!vma)
 		goto out;
+	if (unlikely((vma->vm_flags & VM_SPECIAL) == VM_SPECIAL)) {
+		error = -EINVAL;
+		goto out;
+	}
 	prev = vma->vm_prev;
 	if (unlikely(grows & PROT_GROWSDOWN)) {
 		if (vma->vm_start >= end)

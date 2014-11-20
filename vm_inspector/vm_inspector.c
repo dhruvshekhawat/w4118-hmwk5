@@ -27,18 +27,19 @@ static inline int is_verbose(char *arg)
 
 #define PAGE_SIZE			(4*1024)
 #define PGD_TABLE_SIZE			(1024*PAGE_SIZE)
+#define PAGE_SHIFT			12
 #define expose_page_table(a, b, c)	syscall(378, a, b, c)
 /* TODO IMPLEMENT BELOW */
-#define virt(vma)			0
-#define phys(vma)			0
-#define filebit(vma)			0
-#define dirtybit(vma)			0
-#define readonlybit(vma)		0
+#define virt(vma)			(vma*PAGE_SIZE)
+#define phys(vma)			(vma >> PAGE_SHIFT)
+#define filebit(vma)			((vma & (1 << 2)) > 0)
+#define dirtybit(vma)			((vma & (1 << 6)) > 0)
+#define readonlybit(vma)		((vma & (1 << 7)) > 0)
 #define xnbit(vma)			0
 
 int main(int argc, char **argv)
 {
-	int i;
+//	int i;//, x;
 	int fd;
 	int ret;
 	int pid = -1;
@@ -46,7 +47,7 @@ int main(int argc, char **argv)
 //	unsigned long vma;
 //	unsigned long *addr;
 	unsigned long fake_pgd;
-	unsigned long accessed;
+//	unsigned long accessed;
 
 
 	if (argc != 2 && argc != 3) {
@@ -104,10 +105,10 @@ int main(int argc, char **argv)
 	close(fd);
 
 
-	for (i = 0; i < PGD_TABLE_SIZE / sizeof(unsigned long); i++) {
-		accessed = (unsigned long)((unsigned long *) fake_pgd + i);
-	}
-	(void) accessed;
+	//for (i = 0; i < PGD_TABLE_SIZE / sizeof(unsigned long); i++) {
+	//	accessed = (unsigned long)((unsigned long *) fake_pgd + i);
+	//}
+	//(void) accessed;
 
 	printf("fake_pgd:%p\n", (void *)fake_pgd);
 	printf("addr:%p\n", (void *) (fake_pgd + PGD_TABLE_SIZE));
@@ -115,22 +116,24 @@ int main(int argc, char **argv)
 	ret = 0;
 	printf("%ld %d %p\n", (long)pid, ret, (void *) (fake_pgd + PGD_TABLE_SIZE));
 	
-	ret = expose_page_table(pid, fake_pgd, fake_pgd + PGD_TABLE_SIZE);
+	ret = expose_page_table(pid, fake_pgd, fake_pgd);
 	if (ret != 0) {
 		perror("syscall: ");
 		return ret;
 	}
 	(void) verbose;
-//	for (i = 0; i < PGD_TABLE_SIZE; i++) {
-//		vma = addr[i*4*1024]; /* TODO not sure if this is correct */
+//	addr = (unsigned long *)(fake_pgd);
+//	for (i = 0; i < PGD_TABLE_SIZE/sizeof(int); i++) {
+//		x = (((i / 512 * PAGE_SIZE) / 4) + (i % 512));
+//		vma = addr[x*4*1024]; /* TODO not sure if this is correct */
 //		if (vma == 0)
-//			printf("%p %p %p %d %d %d %d %d\n",
-//				i, virt(vma), phys(vma),
+//			printf("%d %p %p %d %d %d %d\n",
+//				x, (void *)virt(vma), (void *)phys(vma),
 //				filebit(vma), dirtybit(vma),
 //				readonlybit(vma), xnbit(vma));
 //		else if (verbose)
-//			printf("%p %p 0 0 0 0 0 0", index(vma), virt(vma));
+//			printf("%d %p 0 0 0 0 0 0", i, (void *)virt(vma));
 //	}
-
+//	munmap((void *)fake_pgd, 2 * 4 * 1024 * 1024);
 	return 0;
 }

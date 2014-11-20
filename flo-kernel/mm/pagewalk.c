@@ -48,7 +48,7 @@ again:
 		 */
 		if (walk->pmd_entry) {
 			err = walk->pmd_entry(pmd, addr, next, walk);
-			printk(KERN_ERR "walk_pmd_range: %p\n", walk->pmd_entry);
+			//printk(KERN_ERR "walk_pmd_range err %d\n", err);
 		}
 		if (err)
 			break;
