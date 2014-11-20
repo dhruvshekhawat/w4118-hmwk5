@@ -20,4 +20,4 @@ processes instead of copying them over for each fork()-ed child" (team18, hw2)
 
 Thus, we found a bunch of libraries that are shared across all processes, which
 originate from Zygote. The output of our analysis can be found in
-'common_libs.txt' in the 'vm_inspector' folder.
+'vm_inspector/common_libs.txt'.
