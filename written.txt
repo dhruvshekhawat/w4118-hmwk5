@@ -1,0 +1,23 @@
+E. Atlidakis, G. Koloventzos, A. Papancea
+UNI: ea2615, gk2409, alp2200
+Last updated: 11/20/2014
+
+VM_INSPECTOR Analysis:
+
+We dumped the page tables for 3 processes belonging to the following apps:
+Angry Birds, Google Chrome, Facebook, as well as for Zygote. We also dumped the
+contents of /proc/pid/maps for each of these apps.
+
+Upon inspection of the vm_inspector dumps we identified common PTEs between the
+multiple processes. We crosschecked these outputs with the outputs of
+/proc/pid/maps and identified the names of what these common memory regions pointed to.
+
+What we found was not surprising at all, given the group written part of the
+second homework assignment. As we identified earlier in the semester:
+
+"Zygote optimizes memory usage by sharing the core libraries across child
+processes instead of copying them over for each fork()-ed child" (team18, hw2)
+
+Thus, we found a bunch of libraries that are shared across all processes, which
+originate from Zygote. The output of our analysis can be found in
+'common_libs.txt' in the 'vm_inspector' folder.
