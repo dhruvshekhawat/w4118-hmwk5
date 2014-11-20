@@ -2802,6 +2802,10 @@ static int map_fake_pgd(pud_t *pud, unsigned long addr,
 }
 static int pgd_entry(pgd_t *pgd, unsigned long addr,
 			unsigned long end, struct mm_walk *walk){
+
+//	static unsigned long target;
+//	target = ((struct metadata *) walk->private)->current_addr;
+
 	return 0;
 }
 //	int rval;
@@ -2843,7 +2847,6 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 	struct mm_struct *mm;
 	struct vm_area_struct *vma, *target_vma;
 	unsigned long end_vaddr;
-	struct fake_pgd *fpgd;
 	struct exposed_page_table *ept;
 	end_vaddr = TASK_SIZE_OF(task);
 
@@ -2865,7 +2868,7 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 	down_write(&mm->mmap_sem);
 /*	if (pid != -1)
 		down_write(&target_tsk->vm_mm->mmap_sem);*/
-	vma = find_vma(mm, fake_pgd);
+	vma = find_vma(mm, addr);
 	if (vma == NULL) {
 		printk(KERN_ERR "expose_page_table: Cannot find VMA\n");
 		rval = -EFAULT;
@@ -2898,18 +2901,18 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 		goto error;
 	}
 	/* Be sure we do not access something outside of our vma*/
-	if (unlikely(fake_pgd != vma->vm_start)) {
+	if (unlikely(addr != vma->vm_start)) {
 		 printk(KERN_ERR "expose_page_table: __split_vma 0\n");
-		rval = __split_vma(mm, vma, fake_pgd, 1);
+		rval = __split_vma(mm, vma, addr, 1);
 		if (rval) {
 			printk(KERN_ERR "expose_page_table: __split_vma 1\n");
 			goto error;
 		}
 	}
 
-	if (unlikely(fake_pgd + 8* 1024 * 1024 != vma->vm_end)) {
+	if (unlikely(addr + 8* 1024 * 1024 != vma->vm_end)) {
 		 printk(KERN_ERR "expose_page_table: __split_vma 1+\n");
-		rval = __split_vma(mm, vma, fake_pgd + EXPOSED_TABLE_SIZE, 0);
+		rval = __split_vma(mm, vma, addr + EXPOSED_TABLE_SIZE, 0);
 		if (rval) {
 			printk(KERN_ERR "expose_page_table: __split_vma 2\n");
 			goto error;
