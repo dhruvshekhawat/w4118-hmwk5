@@ -573,7 +573,7 @@ void free_pgtables(struct mmu_gather *tlb, struct vm_area_struct *vma,
 int __pte_alloc(struct mm_struct *mm, struct vm_area_struct *vma,
 		pmd_t *pmd, unsigned long address)
 {
-	struct exposed_page_table *p;
+//	struct exposed_page_table *p;
 
 	pgtable_t new = pte_alloc_one(mm, address);
 	int wait_split_huge_page;
@@ -2203,6 +2203,8 @@ static int remap_pte_range(struct mm_struct *mm, pmd_t *pmd,
 		return -ENOMEM;
 	arch_enter_lazy_mmu_mode();
 	do {
+//		printk(KERN_ERR "pte: %p pfn: %p addr: %p end: %p\n",
+//		       (void *) pte, (void *) pfn, (void *) addr,(void *) end);
 		BUG_ON(!pte_none(*pte));
 		set_pte_at(mm, addr, pte, pte_mkspecial(pfn_pte(pfn, prot)));
 		pfn++;
@@ -2317,6 +2319,9 @@ int remap_pfn_range(struct vm_area_struct *vma, unsigned long addr,
 		next = pgd_addr_end(addr, end);
 		err = remap_pud_range(mm, pgd, addr, next,
 				pfn + (addr >> PAGE_SHIFT), prot);
+//		printk(KERN_ERR "pgd: %p pfn: %p addr: %p end: %p next: %p\n",
+//		       (void *) pgd, (void *) pfn, (void *) addr,
+//		       (void *) end, (void *) next);
 		if (err)
 			break;
 	} while (pgd++, addr = next, addr != end);
