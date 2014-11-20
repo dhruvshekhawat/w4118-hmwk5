@@ -6,7 +6,7 @@ VM_INSPECTOR Analysis:
 
 We dumped the page tables for 3 processes belonging to the following apps:
 Angry Birds, Google Chrome, Facebook, as well as for Zygote. We also dumped the
-contents of /proc/pid/maps for each of these apps.
+contents of /proc/pid/maps for each of these processes.
 
 Upon inspection of the vm_inspector dumps we identified common PTEs between the
 multiple processes. We crosschecked these outputs with the outputs of
