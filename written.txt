@@ -4,13 +4,14 @@ Last updated: 11/20/2014
 
 VM_INSPECTOR Analysis:
 
-We dumped the page tables for 3 processes belonging to the following apps:
-Angry Birds, Google Chrome, Facebook, as well as for Zygote. We also dumped the
-contents of /proc/pid/maps for each of these processes.
+Using the vm_inspector we dumped the page tables for 4 processes belonging to
+the following apps: Angry Birds, Google Chrome, Facebook, as well as for Zygote.
+We also dumped the contents of /proc/pid/maps for each of these processes.
 
-Upon inspection of the vm_inspector dumps we identified common PTEs between the
+Upon analysis of the vm_inspector dumps we identified common PTEs between
 multiple processes. We crosschecked these outputs with the outputs of
-/proc/pid/maps and identified the names of what these common memory regions pointed to.
+/proc/pid/maps and identified the names of what these common memory regions
+pointed to.
 
 What we found was not surprising at all, given the group written part of the
 second homework assignment. As we identified earlier in the semester:
@@ -19,5 +20,9 @@ second homework assignment. As we identified earlier in the semester:
 processes instead of copying them over for each fork()-ed child" (team18, hw2)
 
 Thus, we found a bunch of libraries that are shared across all processes, which
-originate from Zygote. The output of our analysis can be found in
-'vm_inspector/common_libs.txt'.
+originate from Zygote. We concluded that these libraries are common because they
+all point to the same physical frames. That is aligned with the purpose of
+shared objects (.so dynamic libraries) that are common and read-only to multiple
+processes within the same system.
+
+The output of our analysis can be found in 'vm_inspector/common_libs.txt'.
