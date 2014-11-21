@@ -7,6 +7,8 @@ ASSUMPTIONS:
 We did not create the fake PGD, but in our vm_inspector we implemented
 appropriate macros that traverse the PTEs on a contiguous mmap-ed memory.
 
+Please use last commit in the 'lost_hope' branch.
+
 MODIFIED/ADDED FILES:
 
 - flo-kernel/arch/arm/include/asm/unistd.h
