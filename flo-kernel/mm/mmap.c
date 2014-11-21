@@ -2065,7 +2065,7 @@ int split_vma(struct mm_struct *mm, struct vm_area_struct *vma,
 int do_munmap(struct mm_struct *mm, unsigned long start, size_t len)
 {
 	unsigned long end;
-	struct vm_area_struct *vma, *prev, *last, *tmp;
+	struct vm_area_struct *vma, *prev, *last;
 
 	if ((start & ~PAGE_MASK) || start > TASK_SIZE || len > TASK_SIZE-start)
 		return -EINVAL;
@@ -2292,14 +2292,14 @@ void exit_mmap(struct mm_struct *mm)
 	struct mmu_gather tlb;
 	struct vm_area_struct *vma;
 	unsigned long nr_accounted = 0;
-
+	
 	/* mm's last user has gone, and its about to be pulled down */
 	mmu_notifier_release(mm);
 
 	if (mm->locked_vm) {
 		vma = mm->mmap;
 		while (vma) {
-			if (vma->vm_flags & VM_LOCKED)
+			if (vma->vm_flags & VM_LOCKED )
 				munlock_vma_pages_all(vma);
 			vma = vma->vm_next;
 		}
@@ -2864,10 +2864,11 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 		return -EINVAL;
 
 	mm = current->mm;
-	/* find the first vma after addr */
+	
 	down_write(&mm->mmap_sem);
-/*	if (pid != -1)
-		down_write(&target_tsk->vm_mm->mmap_sem);*/
+	if (pid != -1)
+		down_write(&target_tsk->mm->mmap_sem);
+
 	vma = find_vma(mm, addr);
 	if (vma == NULL) {
 		printk(KERN_ERR "expose_page_table: Cannot find VMA\n");
@@ -2875,7 +2876,7 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 		goto error;
 	}
 
-	if (vma->vm_end - addr < 8* 1024 * 1024 || (vma->vm_flags & (VM_WRITE | VM_SPECIAL))) {
+	if (vma->vm_end - addr < EXPOSED_TABLE_SIZE || (vma->vm_flags & (VM_WRITE | VM_SPECIAL))) {
 		 printk(KERN_ERR "expose_page_table: addr %p exceeds limit\n",
 			(void *)addr);
 		rval = -EINVAL;
@@ -2910,7 +2911,7 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 		}
 	}
 
-	if (unlikely(addr + 8* 1024 * 1024 != vma->vm_end)) {
+	if (unlikely(addr + EXPOSED_TABLE_SIZE != vma->vm_end)) {
 		 printk(KERN_ERR "expose_page_table: __split_vma 1+\n");
 		rval = __split_vma(mm, vma, addr + EXPOSED_TABLE_SIZE, 0);
 		if (rval) {
@@ -2941,6 +2942,7 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 
 	target_vma = find_vma(target_tsk->mm, target_tsk->mm->mmap->vm_start);
 	
+	current->mm->pinned = 1;
 	for (target_vma = target_tsk->mm->mmap ; target_vma->vm_next != NULL;
 	     target_vma = target_vma->vm_next)
 	{
@@ -2952,12 +2954,13 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 	}
 	
 	/* TODO: rval err */
-	target_vma->vm_flags |= VM_SPECIAL;
+	vma->vm_flags |= VM_SPECIAL;
 
 	rval = 0;
 error:
-/*	if (pid == -1)
-		up_write(&target_vma->vm_mm->mmap_sem);*/
+	if (pid != -1)
+		up_write(&target_tsk->mm->mmap_sem);
+
 	up_write(&mm->mmap_sem);
 	return rval;
 }
