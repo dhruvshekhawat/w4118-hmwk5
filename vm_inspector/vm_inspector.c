@@ -23,11 +23,11 @@
 #define pte_base(index)			(((index / 512) * PAGE_SIZE) / 4)
 #define base_address(page)		(page * PAGE_SIZE)
 #define pfn_of_pte(pte)			(pte >> PAGE_SHIFT)
-
-#define filebit(vma)			((vma & (1 << 2)) > 0)
-#define dirtybit(vma)			((vma & (1 << 6)) > 0)
-#define readonlybit(vma)		((vma & (1 << 7)) > 0)
-#define xnbit(vma)			0
+#define youngbit(pte)			((pte & (1 << 1)) > 0)
+#define filebit(pte)			((pte & (1 << 2)) > 0)
+#define dirtybit(pte)			((pte & (1 << 6)) > 0)
+#define readonlybit(pte)		((pte & (1 << 7)) > 0)
+#define xnbit(pte)			0
 #define pte_none(pte)			(!pte)
 
 #define expose_page_table(a, b, c)	syscall(378, a, b, c)
@@ -122,18 +122,20 @@ int main(int argc, char **argv)
 		return rval;
 	}
 
-	for (i = 0; i < EXPOSED_TBL_ENTRIES; ++i) {
+	printf("[index] [virt] [phys] [young bit] [file bit] [dirty bit]"
+	       "[read-only bit] [xn bit]\n");
 
+	for (i = 0; i < EXPOSED_TBL_ENTRIES; ++i) {
 		unsigned int pte;
 
 		if (((unsigned long *)fake_pgd)[pte_base(i) +
 		     pte_offset(i)] != 0) {
 			pte = ((unsigned long *)fake_pgd)[pte_base(i) +
 				pte_offset(i)];
-			printf("%d 0x%x 0x%x %d %d %d\n",
-			       i, base_address(i),
-			       pfn_of_pte(pte), filebit(pte),
-			       dirtybit(pte), readonlybit(pte));
+			printf("0x%x 0x%x 0x%x %d %d %d %d %d\n",
+			       i, base_address(i), pfn_of_pte(pte),
+			       youngbit(pte), filebit(pte), dirtybit(pte),
+			       readonlybit(pte), xnbit(pte));
 			continue;
 		}
 		if (verbose)
