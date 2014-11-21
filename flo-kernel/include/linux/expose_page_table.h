@@ -38,6 +38,7 @@
  * callback.
  *
  * @caller_vma: The caller's vma dedicated to expore the remaping
+<<<<<<< HEAD
  * @addr: The current address when expose_pfn_range is exposeing 
  * 	  remapped ptes.
  */
@@ -179,3 +180,12 @@ struct walk_metadata {
 
 
 
+=======
+ * @addr: The current address when expose_pfn_range is exposeing
+ *        remapped ptes.
+ */
+struct walk_metadata {
+	struct vm_area_struct *caller_vma;
+	unsigned long current_addr;
+};
+>>>>>>> lost_hope
