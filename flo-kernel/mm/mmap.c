@@ -2886,6 +2886,7 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 	vma->vm_flags |= VM_SPECIAL;
 	rval = 0;
 error:
+	current->mm->pinned = 0;
 	if (pid != -1)
 		up_write(&target_tsk->mm->mmap_sem);
 
