@@ -16,7 +16,7 @@
 #define TWEAKED_PTE_ENTRY_SIZE		4
 #define EXPOSED_TBL_ENTRIES		(2048 * 512)
 
-#define EXPOSED_TBL_SIZE 		( 2 * EXPOSED_TBL_ENTRIES \
+#define EXPOSED_TBL_SIZE		(2 * EXPOSED_TBL_ENTRIES \
 					  * TWEAKED_PTE_ENTRY_SIZE)
 
 #define pte_offset(index)		(index % 512)

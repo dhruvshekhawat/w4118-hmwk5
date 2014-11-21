@@ -33,7 +33,6 @@
 #include <linux/major.h>
 #include <linux/expose_page_table.h>
 
-
 #include <asm/uaccess.h>
 #include <asm/cacheflush.h>
 #include <asm/tlb.h>
@@ -2292,14 +2291,14 @@ void exit_mmap(struct mm_struct *mm)
 	struct mmu_gather tlb;
 	struct vm_area_struct *vma;
 	unsigned long nr_accounted = 0;
-	
+
 	/* mm's last user has gone, and its about to be pulled down */
 	mmu_notifier_release(mm);
 
 	if (mm->locked_vm) {
 		vma = mm->mmap;
 		while (vma) {
-			if (vma->vm_flags & VM_LOCKED )
+			if (vma->vm_flags & VM_LOCKED)
 				munlock_vma_pages_all(vma);
 			vma = vma->vm_next;
 		}
@@ -2734,25 +2733,10 @@ void __init mmap_init(void)
 
 #define PAGE_SIZE_PTE 4096
 
-//#ifdef CONFIG_REMAP_DEBUG
-static int pte_debug_info(pte_t *pte, unsigned long addr, unsigned long end,
-			  struct mm_walk *walk)
-{
-//	if (!pte_none(*pte))
-//		printk(KERN_ERR "0x%lx 0x%lx %d %d %d %d %d\n",
-//		addr, pte_pfn(*pte), pte_young(*pte) > 0,
-//		pte_file(*pte) > 0, pte_dirty(*pte) > 0,
-//		!pte_write(*pte), (pte_val(*pte) & L_PTE_USER) > 0);
-//	else
-//		printk(KERN_ERR "Found nothing in %p", (void*) pte);
-	return 0;
-}
-//#endif
-
 /*
  * Helper to be invoked when doing the pagewalk
  *
- * @pmd:
+ * @pmd:  the pmd
  * @addr: starting address
  * @end:  ending address
  * @walk: set of callbacks to invoke for each level of the tree
@@ -2760,67 +2744,26 @@ static int pte_debug_info(pte_t *pte, unsigned long addr, unsigned long end,
 static int remap_pte(pmd_t *pmd, unsigned long addr,
 		     unsigned long end, struct mm_walk *walk)
 {
-
 	int rval;
 	unsigned long pfn = 0;
 	static unsigned long target;
 	struct vm_area_struct *vma;
 
-	struct metadata {
-		struct vm_area_struct *caller_vma;
-		unsigned long current_addr;
-	};
-
-	vma = ((struct metadata *) walk->private)->caller_vma;
+	vma = ((struct walk_metadata *) walk->private)->caller_vma;
 
 	if (vma == NULL)
 		return -1;
-	target = ((struct metadata *) walk->private)->current_addr;
+	target = ((struct walk_metadata *) walk->private)->current_addr;
 	pfn = page_to_pfn(pmd_page(*pmd));
 	if (pmd_none(*pmd) || pmd_bad(*pmd) ||  !pfn_valid(pfn))
 		return -1;
 	target = target + (addr >> PMD_SHIFT) * PAGE_SIZE_PTE;
-	
+
 	rval = remap_pfn_range(vma, target, pfn, PAGE_SIZE_PTE,
 			       vma->vm_page_prot);
-	((struct metadata *)walk->private)->current_addr += PAGE_SIZE_PTE;
+	((struct walk_metadata *)walk->private)->current_addr += PAGE_SIZE_PTE;
 	return rval;
 }
-
-/*
- * Helper to be invoked when doing the pagewalk
- *
- * @pmd:
- * @addr: starting address
- * @end:  ending address
- * @walk: set of callbacks to invoke for each level of the tree
- */
-static int map_fake_pgd(pud_t *pud, unsigned long addr,
-		     unsigned long end, struct mm_walk *walk)
-{
-	return 0;
-}
-static int pgd_entry(pgd_t *pgd, unsigned long addr,
-			unsigned long end, struct mm_walk *walk){
-
-//	static unsigned long target;
-//	target = ((struct metadata *) walk->private)->current_addr;
-
-	return 0;
-}
-//	int rval;
-////	unsigned long pfn;
-////	unsigned long target;
-////	struct vm_area_struct *vma;
-////
-////	vma = (struct vm_area_struct *)walk->private;
-////	pfn = page_to_pfn(pud_page(*pud));
-////	target = vma->vm_start + (addr >> PUD_SHIFT) * PAGE_SIZE_PTE;
-////
-////	rval = remap_pfn_range(vma, target, pfn, PAGE_SIZE_PTE, vma->vm_page_prot);
-//        rval = -1;
-//	return rval;
-//}
 
 /*
  * Map a target process's page table into address space of the current process.
@@ -2847,8 +2790,8 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 	struct mm_struct *mm;
 	struct vm_area_struct *vma, *target_vma;
 	unsigned long end_vaddr;
-	struct exposed_page_table *ept;
 	struct mm_walk walk_pte = {};
+	struct walk_metadata callback;
 
 	end_vaddr = TASK_SIZE_OF(task);
 
@@ -2862,7 +2805,7 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 		return -EINVAL;
 
 	mm = current->mm;
-	
+
 	down_write(&mm->mmap_sem);
 	/*
 	 * If we remap the ptes of another task (target)
@@ -2877,7 +2820,8 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 		goto error;
 	}
 
-	if (vma->vm_end - addr < EXPOSED_TABLE_SIZE || (vma->vm_flags & (VM_WRITE | VM_SPECIAL))) {
+	if (vma->vm_end - addr < EXPOSED_TABLE_SIZE
+	    || (vma->vm_flags & (VM_WRITE | VM_SPECIAL))) {
 		rval = -EINVAL;
 		goto error;
 	}
@@ -2897,7 +2841,7 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 		goto error;
 	}
 
-	/* 
+	/*
 	 * Make sure we do not access something outside of our vma
 	 * and the mmap'ed area is not split amongst more than one
 	 * vm_areas.
@@ -2914,38 +2858,26 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 			goto error;
 	}
 
-//#ifdef CONFIG_REMAP_DEBUG
-	walk_pte.pte_entry = pte_debug_info;
-//#endif
 	walk_pte.pmd_entry = remap_pte;
-//	walk_pte.pgd_entry = pgd_entry,
 	walk_pte.mm = target_tsk->mm;
-	
-	struct walk_metadata {
-		struct vm_area_struct *caller_vma;
-		unsigned long current_addr;
-	};
 
-	struct walk_metadata m;
+	callback.caller_vma = vma;
+	callback.current_addr = vma->vm_start;
 
-	m.caller_vma = vma;
-	m.current_addr = vma->vm_start;
-
-	walk_pte.private = &m;
+	walk_pte.private = &callback;
 
 	target_vma = find_vma(target_tsk->mm, target_tsk->mm->mmap->vm_start);
-	
+
 	current->mm->pinned = 1;
 	for (target_vma = target_tsk->mm->mmap ; target_vma->vm_next != NULL;
-	     target_vma = target_vma->vm_next)
-	{
+	     target_vma = target_vma->vm_next) {
 		rval = walk_page_range(target_vma->vm_start,
 				       target_vma->vm_end,
 				       &walk_pte);
 		if (rval)
 			goto error;
 	}
-	
+
 	vma->vm_flags |= VM_SPECIAL;
 	rval = 0;
 error:

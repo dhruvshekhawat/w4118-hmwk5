@@ -685,7 +685,7 @@ static void exit_mm(struct task_struct * tsk)
 	task_unlock(tsk);
 	mm_update_next_owner(mm);
 
-	if(mm->pinned)
+	if (mm->pinned)
 		return;
 
 	mm_released = mmput(mm);
