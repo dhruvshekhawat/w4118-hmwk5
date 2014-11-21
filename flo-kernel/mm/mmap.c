@@ -2751,11 +2751,17 @@ static int remap_pte(pmd_t *pmd, unsigned long addr,
 
 	vma = ((struct walk_metadata *) walk->private)->caller_vma;
 
+	/*
+	 * Preventing remapping of kernel PTEs
+	 */
+	if (addr >= (unsigned long)TASK_SIZE_OF(task)) {
+		return 0;
+	}
 	if (vma == NULL)
 		return -1;
 	target = ((struct walk_metadata *) walk->private)->current_addr;
 	pfn = page_to_pfn(pmd_page(*pmd));
-	if (pmd_none(*pmd) || pmd_bad(*pmd) ||  !pfn_valid(pfn))
+	if (pmd_none(*pmd) || pmd_bad(*pmd) || !pfn_valid(pfn))
 		return -1;
 	target = target + (addr >> PMD_SHIFT) * PAGE_SIZE_PTE;
 
@@ -2796,7 +2802,7 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 	end_vaddr = TASK_SIZE_OF(task);
 
 	/* check alignmnet */
-	if (addr & ~PAGE_MASK || fake_pgd & ~PAGE_MASK)
+	if (addr & ~PAGE_MASK)
 		return -EINVAL;
 
 	/* find task whose pte will be remapped */
