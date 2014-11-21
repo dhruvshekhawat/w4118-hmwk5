@@ -2848,17 +2848,15 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 	struct vm_area_struct *vma, *target_vma;
 	unsigned long end_vaddr;
 	struct exposed_page_table *ept;
+	struct mm_walk walk_pte = {};
+
 	end_vaddr = TASK_SIZE_OF(task);
 
-	struct mm_walk walk_pte = {};
-	
-
-	if (addr & ~PAGE_MASK || fake_pgd & ~PAGE_MASK) {
-		printk(KERN_ERR "expose_page_table: "
-		       "addr or fake_pgd not page alligned...\n");
+	/* check alignmnet */
+	if (addr & ~PAGE_MASK || fake_pgd & ~PAGE_MASK)
 		return -EINVAL;
-	}
 
+	/* find task whose pte will be remapped */
 	target_tsk = pid == -1 ? current : find_task_by_vpid(pid);
 	if (target_tsk == NULL)
 		return -EINVAL;
@@ -2866,60 +2864,55 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 	mm = current->mm;
 	
 	down_write(&mm->mmap_sem);
+	/*
+	 * If we remap the ptes of another task (target)
+	 * we must hold its mmap_sem along with current's.
+	 */
 	if (pid != -1)
 		down_write(&target_tsk->mm->mmap_sem);
 
 	vma = find_vma(mm, addr);
 	if (vma == NULL) {
-		printk(KERN_ERR "expose_page_table: Cannot find VMA\n");
 		rval = -EFAULT;
 		goto error;
 	}
 
 	if (vma->vm_end - addr < EXPOSED_TABLE_SIZE || (vma->vm_flags & (VM_WRITE | VM_SPECIAL))) {
-		 printk(KERN_ERR "expose_page_table: addr %p exceeds limit\n",
-			(void *)addr);
 		rval = -EINVAL;
 		goto error;
 	}
 
 	if (vma->vm_file) {
 		inode = vma->vm_file->f_path.dentry->d_inode;
-		/* Should we have more? This is for inode to be in /dev/zero*/
+		/*
+		 * Should we have more? This is for inode to be in /dev/zero
+		 */
 		if (imajor(inode) != MEM_MAJOR &&
 		    iminor(inode) != 5) {
-			printk(KERN_ERR "expose_page_table: d_iname: %s\n",
-			       vma->vm_file->f_path.dentry->d_iname);
-			printk(KERN_ERR "expose_page_table: addr not properly "
-			       "initialized %d %d\n", imajor(inode), MEM_MAJOR);
 			rval = -EINVAL;
 			goto error;
 		}
 	} else {
-		printk(KERN_ERR "expose_page_table: addr not mmap'ed to "
-		       "/dev/zero\n");
 		rval = -EINVAL;
 		goto error;
 	}
-	/* Be sure we do not access something outside of our vma*/
+
+	/* 
+	 * Make sure we do not access something outside of our vma
+	 * and the mmap'ed area is not split amongst more than one
+	 * vm_areas.
+	 */
 	if (unlikely(addr != vma->vm_start)) {
-		 printk(KERN_ERR "expose_page_table: __split_vma 0\n");
 		rval = __split_vma(mm, vma, addr, 1);
-		if (rval) {
-			printk(KERN_ERR "expose_page_table: __split_vma 1\n");
+		if (rval)
 			goto error;
-		}
 	}
 
 	if (unlikely(addr + EXPOSED_TABLE_SIZE != vma->vm_end)) {
-		 printk(KERN_ERR "expose_page_table: __split_vma 1+\n");
 		rval = __split_vma(mm, vma, addr + EXPOSED_TABLE_SIZE, 0);
-		if (rval) {
-			printk(KERN_ERR "expose_page_table: __split_vma 2\n");
+		if (rval)
 			goto error;
-		}
 	}
-
 
 //#ifdef CONFIG_REMAP_DEBUG
 	walk_pte.pte_entry = pte_debug_info;
@@ -2953,9 +2946,7 @@ SYSCALL_DEFINE3(expose_page_table, pid_t, pid, unsigned long, fake_pgd,
 			goto error;
 	}
 	
-	/* TODO: rval err */
 	vma->vm_flags |= VM_SPECIAL;
-
 	rval = 0;
 error:
 	if (pid != -1)
