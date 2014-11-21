@@ -9,22 +9,26 @@
 #include <sys/mman.h>
 #include <sys/types.h>
 
-#define TWEAKED_PGD_ENTRIES		2048
-#define TWEAKED_PTE_ENTRIES		512
-#define EXPOSED_TBL_ENTRIES		(2048 * 512)
 #define PAGE_SIZE			4096
 #define PAGE_SHIFT			12
+#define TWEAKED_PGD_ENTRIES		2048
+#define TWEAKED_PTE_ENTRIES		512
+#define TWEAKED_PTE_ENTRY_SIZE		4
+#define EXPOSED_TBL_ENTRIES		(2048 * 512)
 
+#define EXPOSED_TBL_SIZE 		( 2 * EXPOSED_TBL_ENTRIES \
+					  * TWEAKED_PTE_ENTRY_SIZE)
+
+#define pte_offset(index)		(index % 512)
+#define pte_base(index)			(((index / 512) * PAGE_SIZE) / 4)
 #define base_address(page)		(page * PAGE_SIZE)
 #define pfn_of_pte(pte)			(pte >> PAGE_SHIFT)
+
 #define filebit(vma)			((vma & (1 << 2)) > 0)
 #define dirtybit(vma)			((vma & (1 << 6)) > 0)
 #define readonlybit(vma)		((vma & (1 << 7)) > 0)
 #define xnbit(vma)			0
 #define pte_none(pte)			(!pte)
-
-#define pte_offset(index)		(index % 512)
-#define pte_base(index)			(((index / 512) * PAGE_SIZE) / 4)
 
 #define expose_page_table(a, b, c)	syscall(378, a, b, c)
 
@@ -61,7 +65,6 @@ int main(int argc, char **argv)
 		printf("Usage:%s [-v] pid\n", argv[0]);
 		return -1;
 	}
-
 	pid = -1;
 	verbose = 0;
 	if (argc == 2) {
@@ -103,7 +106,7 @@ int main(int argc, char **argv)
 	}
 
 	fake_pgd = (unsigned long) mmap(NULL,
-					3 * 4 * 1024 * 1024,
+					EXPOSED_TBL_SIZE,
 					PROT_READ, MAP_SHARED, fd, 0);
 
 	if (fake_pgd == (unsigned long) NULL) {
@@ -135,10 +138,9 @@ int main(int argc, char **argv)
 		}
 		if (verbose)
 			printf("0 0x0 0x0 0 0 0\n");
-
 	}
 
-	munmap((void *)fake_pgd, 3 * 4 * 1024 * 1024);
+	munmap((void *)fake_pgd, EXPOSED_TBL_SIZE);
 
 	return 0;
 }
