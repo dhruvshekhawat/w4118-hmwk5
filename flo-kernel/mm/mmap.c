@@ -2754,9 +2754,8 @@ static int remap_pte(pmd_t *pmd, unsigned long addr,
 	/*
 	 * Preventing remapping of kernel PTEs
 	 */
-	if (addr >= (unsigned long)TASK_SIZE_OF(task)) {
+	if (addr >= (unsigned long)TASK_SIZE_OF(task))
 		return 0;
-	}
 	if (vma == NULL)
 		return -1;
 	target = ((struct walk_metadata *) walk->private)->current_addr;
