@@ -27,7 +27,7 @@
 #define filebit(pte)			((pte & (1 << 2)) > 0)
 #define dirtybit(pte)			((pte & (1 << 6)) > 0)
 #define readonlybit(pte)		((pte & (1 << 7)) > 0)
-#define xnbit(pte)			0
+#define xnbit(pte)			((pte & (1 << 8)) > 0)
 #define pte_none(pte)			(!pte)
 
 #define expose_page_table(a, b, c)	syscall(378, a, b, c)
