@@ -1,10 +1,11 @@
 E. Atlidakis, G. Koloventzos, A. Papancea
 UNI: ea2615, gk2409, alp2200
-Last updated: 11/16/2014
+Last updated: 11/20/2014
 
 ASSUMPTIONS:
 
-We followed the instructions without making any additional assumptions.
+We did not create the fake PGD, but in our vm_inspector we implemented
+appropriate macros that traverse the PTEs on a contiguous mmap-ed memory.
 
 MODIFIED/ADDED FILES:
 
@@ -17,14 +18,28 @@ MODIFIED/ADDED FILES:
 - flo-kernel/include/linux/syscalls.h
   defined the syscall expose_page_table
 
-- flo-kernel/kernel/expose_page_table.c
+- flo-kernel/mm/mmap.c
   expose_page_table syscall implementation
-
-- flo-kernel/kernel/Makefile
-  added expose_page_table.o binary to kernel Makefile
 
 - vm_inspector/vm_inspector.c
   the test program that prints out the fake pgd of the given pid
+
+- flo-kernel/include/linux/expose_page_table.h
+  header file for syscall
+
+- flo-kernel/mm/mmap.c
+  the implementation of the syscall
+
+- vm_inspector/vm_inspector.c
+  the implementation of the vm_inspector test program
+
+- flo-kernel/mm/mremap.c
+- flo-kernel/mm/memory.c
+- flo-kernel/kernel/exit.c
+- flo-kernel/kernel/fork.c
+- flo-kernel/mm/mprotect.c
+- flo-kernel/mm/pagewalk.c
+- flo-kernel/include/linux/mm_types.h
 
 RESOURCES USED:
 
