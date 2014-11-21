@@ -95,9 +95,6 @@ int main(int argc, char **argv)
 		}
 	}
 
-	/*
-	 * TODO: Remove this and use MAP_PRIVATE
-	 */
 	fd = open("/dev/zero", O_RDONLY);
 	if (fd == -1) {
 		close(fd);
@@ -122,8 +119,8 @@ int main(int argc, char **argv)
 		return rval;
 	}
 
-	printf("[index] [virt] [phys] [young bit] [file bit] [dirty bit]"
-	       "[read-only bit] [xn bit]\n");
+	printf("[index] [virt] [phys] [young bit] [file bit] [dirty bit]");
+	printf("[read-only bit] [xn bit]\n");
 
 	for (i = 0; i < EXPOSED_TBL_ENTRIES; ++i) {
 		unsigned int pte;
@@ -132,14 +129,14 @@ int main(int argc, char **argv)
 		     pte_offset(i)] != 0) {
 			pte = ((unsigned long *)fake_pgd)[pte_base(i) +
 				pte_offset(i)];
-			printf("0x%x 0x%x 0x%x %d %d %d %d %d\n",
+			printf("0x%d 0x%x 0x%x %d %d %d %d %d\n",
 			       i, base_address(i), pfn_of_pte(pte),
 			       youngbit(pte), filebit(pte), dirtybit(pte),
 			       readonlybit(pte), xnbit(pte));
 			continue;
 		}
 		if (verbose)
-			printf("0 0x0 0x0 0 0 0\n");
+			printf("0x%d 0x%x 0 0 0 0 0 0\n", i, base_address(i));
 	}
 
 	munmap((void *)fake_pgd, EXPOSED_TBL_SIZE);
