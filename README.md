@@ -1,12 +1,10 @@
-E. Atlidakis, G. Koloventzos, A. Papancea
-UNI: ea2615, gk2409, alp2200
-Last updated: 11/16/2014
+Exposing (remapping) process pages tablea into user space on ARM.
+==
+Copyright (C) 2014 V. Atlidakis, G. Koloventzos, A. Papancea
 
-ASSUMPTIONS:
+COMS-W4118 Columbia University
 
-We followed the instructions without making any additional assumptions.
-
-MODIFIED/ADDED FILES:
+## MODIFIED/ADDED FILES:
 
 - flo-kernel/arch/arm/include/asm/unistd.h
   defined expose_page_table syscall at position 378
@@ -26,7 +24,7 @@ MODIFIED/ADDED FILES:
 - vm_inspector/vm_inspector.c
   the test program that prints out the fake pgd of the given pid
 
-RESOURCES USED:
+## RESOURCES USED:
 
 1. Linux Cross Reference
    http://lxr.free-electrons.com
